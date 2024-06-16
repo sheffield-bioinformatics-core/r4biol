@@ -1,0 +1,245 @@
+---
+title: "R Introduction for Biology"
+author: "Mark Dunning"
+date: '`r format(Sys.time(), "Last modified: %d %b %Y")`'
+output: 
+  html_notebook: 
+    toc: yes
+    toc_float: yes
+    css: stylesheets/styles.css
+---
+
+```{r setup, include=FALSE,message=FALSE,warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message=FALSE)
+```
+
+
+# Dealing with data
+
+The [***tidyverse***](https://www.tidyverse.org/) is an eco-system of packages that provides a consistent, intuitive system for data manipulation and visualisation in R.
+
+
+![](https://aberdeenstudygroup.github.io/studyGroup/lessons/SG-T2-JointWorkshop/tidyverse.png)
+
+A spreadsheet that we would normally analyse in Excel can can be imported into R by using a *function* from the readr package.
+
+- `read_csv`
+- `read_tsv`
+
+The readxl package can also import files in Excel's own format
+
+- `read_xls`
+- `read_xlsx`
+
+We will use the file `tcga_clinical_CLEANED.tsv` as an example. This file contains information about biological samples that were included as part of the TCGA (The Cancer Genome Atlas) project - all tumour types.
+
+
+As the file name ends in `.tsv` the function we want is probably `read_tsv`
+
+```{r warning=FALSE,message=FALSE}
+library(readr)
+clinical <- read_tsv("tcga_clinical_CLEANED.tsv")
+```
+
+If you got an error `could not find function "read_tsv"` at the previous step, it will because you don't have the `readr` package loaded. The RStudio output may indicate some problems with the data, but we should be able to proceed.
+
+
+<div class="information">
+If you get really stuck reading data into R, you can use the Import Dataset option from the File menu which will allow you to choose the parameters to read the data interactively
+</div>
+
+The Environment panel of RStudio (top-right) should show that an object called `clinical` has been created. This means that we can start doing analysis this dataset. The choice to call the object `clinical` was ours. We could have used any name instead of `clinical` but we chose something vaguely informative and memorable.
+
+The dimensions of the object should should `7706 obs. of 420 variables`. This means the object we have created contains 7706 rows and 420 columns. Each row is a different observation; in this case a different biological sample. Each column records the value of a different variable. In R's terminology, we have just created a `tibble` which is a special case of something called a `data.frame`. We will see the the object can contain either numbers or text in each column.
+
+RStudio has a browsing functionality available that we can activate using the `View` function
+
+```{r}
+View(clinical)
+```
+
+Observations that are missing are indicated by an `NA`. It may look at first glance that the table mostly contains missing data. This is because some columns are only recorded for particular tumour types and not all tumour types recorded the same information.
+
+# Data Exploration
+
+We will now start to explore the data with a couple of different questions in mind
+
+- **What are the differences in male/female split between different tumour types?**
+- **Is there a difference in diagnosis age in different tumour types?**
+
+The tasks required to do this will be greatly helped by the `dplyr` package.
+
+```{r}
+library(dplyr)
+```
+
+## Choosing what columns to analyse
+
+The `select` function allows us to narrow down the number of variables we are interested in from 420. The first argument is always the name of the data frame. There are numerous different ways of specifying which column(s) you want, including listing the names of the columns of interest. Let's assume we already know the names of columns containing tumour type and gender.
+
+```{r}
+##Note that the spelling of "tumor" has to exactly match that found in the data
+select(clinical, 
+       tumor_tissue_site,
+       gender
+       )
+```
+We can reasonably guess that the Age information would be contained in a column that has "age" somewhere in the name. However, the column is not just called "age" or "Age"
+
+```{r eval=FALSE}
+select(clinical, age)
+select(clinical, Age)
+```
+
+Without manually going through the columns, there are a few "helper" functions that we can employ
+
+```{r}
+select(clinical, starts_with("age"))
+select(clinical, contains("age"))
+select(clinical, contains("age_"))
+```
+
+Up to now we have not changed the underlying dataset. `select` is showing what the dataset looks like with the specified subset. If we want to make permanent changes we can create a variable
+
+```{r}
+analysis_data <- select(clinical,
+                        tumor_tissue_site,
+                        gender,
+                        age_at_diagnosis)
+```
+
+## Restricting rows
+
+The `select` function only performs the very specific task of letting you choose what columns you want to analyse. After using `select`, our dataset `analysis_data` still has all `r nrow(analysis_data)` rows. 
+
+The function to choose the rows we might be interested in is called `filter`. We have to write a short R command to choose the rows. 
+
+e.g. we want only the male samples
+
+```{r}
+filter(analysis_data, gender == "MALE")
+```
+and the females
+
+```{r}
+filter(analysis_data, gender == "FEMALE")
+```
+
+
+An equivalent, but somewhat unnecessary for this example, way would be to ask for rows where the gender is **not equal** to `MALE`
+
+```{r}
+filter(analysis_data, gender != "MALE")
+```
+
+
+But what if we want males with Brain tumours?
+
+```{r}
+filter(analysis_data, gender == "MALE",tumor_tissue_site == "Brain")
+```
+
+
+Brain or Lung tumours? Using a `|` symbol instead of a `,` allows for either of two (or more) conditions to be `TRUE`. 
+
+
+```{r}
+filter(analysis_data, tumor_tissue_site == "Brain" | tumor_tissue_site == "Lung")
+```
+
+
+Although useful for data exploration, it would clearly be inefficient to get gender/tumour type counts in this way. The function `count` can now give us exactly what we want.
+
+```{r}
+count(analysis_data, 
+      tumor_tissue_site,
+      gender)
+```
+
+Before proceeding we probably want to remove any missing observations from the data. These are represented by a `NA` value, which is a special value and not a character label.  
+
+```{r}
+filter(analysis_data, is.na(age_at_diagnosis) | is.na(tumor_tissue_site))
+```
+
+
+```{r}
+analysis_data <- filter(analysis_data, !is.na(age_at_diagnosis), !is.na(tumor_tissue_site))
+```
+
+
+
+A similar function can be used on columns containing numeric data when we might want to calculate some of the summary statistics that we saw earlier.
+
+```{r}
+summarise(analysis_data, 
+          Average = mean(age_at_diagnosis),
+          min = min(age_at_diagnosis),
+          max = max(age_at_diagnosis))
+```
+
+```{r}
+
+data_grouped <- group_by(analysis_data, tumor_tissue_site)
+summarise(data_grouped,Average = mean(age_at_diagnosis),
+          min = min(age_at_diagnosis),
+          max = max(age_at_diagnosis) )
+```
+
+## Overview of plotting
+
+Our recommending way of creating plots in RStudio is to use the `ggplot2` package
+
+```{r}
+library(ggplot2)
+```
+
+A couple of useful references are given here-
+
+- [ggplot2 reference guide](https://posit.co/wp-content/uploads/2022/10/data-visualization-1.pdf)
+- [Flowchart for deciding on what graph type to use](https://www.data-to-viz.com/)
+
+
+The general principle of creating a plot is the same regardless of what kind of plot we want to make
+
+- specify the `data frame` containing the data we want to plot
+- specify which columns in that data frame we want to use for various aesthetic aspects of the plot
+- define the type of plot we want
+- apply any additional format changes
+
+
+In order to compare the age distributions of different tumour types we can imagine this being displayed as a boxplot with
+
+- the age variable on the y-axis
+- the type of tumour on the x-axis
+
+this can be translated into `ggplot2` language as follows -
+
+```{r}
+ggplot(analysis_data, aes(x = tumor_tissue_site, y = age_at_diagnosis)) + geom_boxplot()
+```
+
+```{r}
+ggplot(analysis_data, aes(x = tumor_tissue_site, y = age_at_diagnosis)) + geom_boxplot() + geom_jitter(width=0.1)
+```
+
+
+
+
+A bar plot would be a natural choice for showing the counts of male / female samples. The `geom_bar` plot will automatically count how many 
+
+```{r}
+ggplot(analysis_data, aes(x = gender)) + geom_bar()
+```
+
+
+```{r}
+bladder_data <- filter(analysis_data, tumor_tissue_site == "Bladder")
+ggplot(bladder_data, aes(x = gender)) + geom_bar()
+```
+
+
+```{r}
+ggplot(analysis_data, aes(x = gender)) + geom_bar() + facet_wrap(~tumor_tissue_site)
+```
+
