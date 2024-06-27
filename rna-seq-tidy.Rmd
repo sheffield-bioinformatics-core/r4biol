@@ -1,42 +1,116 @@
 ---
-title: "R Notebook"
+title: "Doing a tidy analysis of RNA-seq data"
 output: html_notebook
 ---
 
+We have prepared an RNA-seq dataset uses cases that appeared in The Cancer Genome Atlas (TCGA) breast cancer cohort. It consists of X primary tumours and Y normal tissue samples. The purpose of the tutorial is to
+
+- show the key stages in performing an RNA-seq analysis from count data
+- doing that analysis in a manner that is consistent with the tidyverse framework
+
+This tutorial uses a framework set out in :-
+https://stemangiola.github.io/rpharma2020_tidytranscriptomics/articles/tidytranscriptomics.html
+
+The data have to be read into R first. It consists of two files containing the counts and "metadata" about the samples. Both are in tab-delimited files so we can use the `read.table` function from base R. The counts are required to be in a numeric matrix form with rownames being gene or feature identifiers. We have to manipulate the input data accordingly.
+
 ```{r}
+meta <- read.table("brca_example_meta.tsv")
 raw <- read.table("brca_example.tsv")
 counts <- raw[,-1]
 rownames(counts) <- raw$ENSEMBL
-
-meta <- read.table("brca_example_meta.tsv")
 ```
 
+The `SummarizedExperiment` is traditionally the way in which RNA-seq data are stored in R.
 
 ```{r}
+library(SummarizedExperiment)
 brca <- SummarizedExperiment(assays=list(counts=counts),
                      colData=meta)
+brca
+```
+The counts can be accessed using the counts function
+
+```{r}
+assay(brca) %>% head
 ```
 
+```{r}
+colData(brca)
+```
+The format is not immediately accessible to those familiar with a "`tidyverse`" mindset. Mainly because the data are "wide" and not "long". Consider the code to visualise the distribution of each sample as a boxplot (which is a common QC task)
+
+```{r eval=FALSE}
+ggplot(data, aes(x = ..., y =...)) + geom_boxplot()
+```
+
+We might also like to subset our data according to particular sample groupings, or retrieve the data for a given gene and then plot.
+
+## Introduction to tidybulk
+
+The `tidybulk` package solves this issues, and also provides a way of performing other common analysis tasks. The long nature of the data in this format is immediately apparent as we have a huge amount of rows. However, we have all the information we require in the table to permit queries using standard `tidyverse` operations.
 
 ```{r}
 library(tidybulk)
 brca_tidy <- brca %>% tidybulk()
+brca_tidy
 ```
+
+We just want to see the counts for a particular biological sample
+
+```{r}
+brca_tidy %>% 
+  filter(patient == "TCGA-BH-A0EE") %>% 
+  dplyr::select(.feature,counts)
+```
+
+We want the counts for a particular gene, and which sample it is most highly-expressed in 
+
+```{r}
+brca_tidy %>% 
+  filter(.feature == "ENSG00000000003.15") %>% 
+    dplyr::select(counts,patient) %>% 
+    arrange(desc(counts))
+```
+
+Or calculate the average expression in different groups.
+
+```{r}
+brca_tidy %>% 
+  filter(.feature == "ENSG00000000003.15") %>% 
+    group_by(shortLetterCode) %>% 
+    summarise(mean(counts))
+```
+
+## Filtering to expressed features
+ 
+
+> Genes with very low counts across all libraries provide little evidence for differential expression and they can interfere with some of the statistical approximations that are used later in the pipeline. They also add to the multiple testing burden when estimating false discovery rates, reducing power to detect differentially expressed genes. These genes should be filtered out prior to further analysis. We can perform the filtering using tidybulk keep_abundant or identify_abundant. These functions can use the edgeR filterByExpr function described in (Law et al. 2016) to automatically identify the genes with adequate abundance for differential expression testing. By default, this will keep genes with ~10 counts in a minimum number of samples, the number of the samples in the smallest group. 
 
 ```{r}
 counts_filtered <- brca_tidy %>% keep_abundant(factor_of_interest=BRCA_Subtype_PAM50)
 ```
 
+## Scaling counts to normalise
+
+> Scaling of counts, normalisation, is performed to eliminate uninteresting differences between samples due to sequencing depth or composition. A more detailed explanation can be found here. In the tidybulk package the function scale_abundance generates scaled counts, with scaling factors calculated on abundant (filtered) transcripts and applied to all transcripts. We can choose from different normalisation methods. Here we will use the default, edgeR’s trimmed mean of M values (TMM), (Robinson and Oshlack 2010). TMM normalisation (and most scaling normalisation methods) scale relative to one sample.
+
 ```{r}
 counts_scaled <- counts_filtered %>% scale_abundance()
 ```
+## Dimensionality reduction
 
+> By far, one of the most important plots we make when we analyse RNA sequencing data are principal-component analysis (PCA) or multi-dimensional scaling (MDS) plots. We reduce the dimensions of the data to identify the greatest sources of variation in the data. A principal components analysis is an example of an unsupervised analysis, where we don’t need to specify the groups. If your experiment is well controlled and has worked well, what we hope to see is that the greatest sources of variation in the data are the treatments/groups we are interested in. It is also an incredibly useful tool for quality control and checking for outliers. We can use the reduce_dimensions function to calculate the dimensions.
 
 ```{r}
 counts_scal_PCA <-
   counts_scaled %>%
   reduce_dimensions(method="PCA")
 ```
+
+```{r}
+counts_scal_PCA %>% pivot_sample()
+```
+
 
 ```{r}
 library(ggplot2)
