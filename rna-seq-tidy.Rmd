@@ -1,0 +1,59 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+raw <- read.table("brca_example.tsv")
+counts <- raw[,-1]
+rownames(counts) <- raw$ENSEMBL
+
+meta <- read.table("brca_example_meta.tsv")
+```
+
+
+```{r}
+brca <- SummarizedExperiment(assays=list(counts=counts),
+                     colData=meta)
+```
+
+
+```{r}
+library(tidybulk)
+brca_tidy <- brca %>% tidybulk()
+```
+
+```{r}
+counts_filtered <- brca_tidy %>% keep_abundant(factor_of_interest=BRCA_Subtype_PAM50)
+```
+
+```{r}
+counts_scaled <- counts_filtered %>% scale_abundance()
+```
+
+
+```{r}
+counts_scal_PCA <-
+  counts_scaled %>%
+  reduce_dimensions(method="PCA")
+```
+
+```{r}
+library(ggplot2)
+
+counts_scal_PCA %>%
+    pivot_sample() %>%
+    ggplot(aes(x=PC1, y=PC2, colour=shortLetterCode)) +
+    geom_point() 
+```
+
+```{r}
+brca_t <- filter(brca_tidy, shortLetterCode == "TP")
+```
+
+```{r}
+brca_t %>% 
+  filter(grepl("ENSG00000091831",.feature)) %>% 
+  ggplot(aes(x = er_status_by_ihc, y =  counts)) + geom_boxplot() + scale_y_log10()
+```
+
