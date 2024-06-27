@@ -1,0 +1,86 @@
+---
+title: "TCGA Breast"
+output: html_notebook
+---
+
+Make sure `ExperimentHub` is installed
+
+```{r eval=FALSE}
+BiocManager::install("ExperimentHub")
+```
+
+
+```{r}
+library(ExperimentHub)
+hub <- ExperimentHub()
+x <- query(hub, c("GSE62944", "tumor"))
+x
+y <- query(hub, c("GSE62944", "normal"))
+y
+## Not run:
+## download resource
+se_tumor = x[[1]]
+se_normal = y[[1]]
+
+saveRDS(se_tumor, "data/se_tumour_all.RDS")
+saveRDS(se_normal, "data/se_normal_all.RDS")
+```
+
+```{r}
+brca <- se_tumor[,se_tumor$CancerType == "BRCA"]
+brca <- makeSummarizedExperimentFromExpressionSet(brca)
+brca_normal <- se_normal[,se_normal$type == "BRCA"]
+saveRDS(brca, "data/brca_tumour.RDS")
+saveRDS(brca_normal, "data/brca_normal.RDS")
+```
+
+```{r}
+library(SummarizedExperiment)
+brca <- readRDS("data/brca_tumour.RDS")
+set.seed(20240626)
+rand_tumours <- sample(1:ncol(brca),100)
+
+brca_rand <- makeSbrca[,rand_tumours]
+```
+
+```{r}
+library(SummarizedExperiment)
+library(TCGAbiolinks)
+
+query.exp <- GDCquery(
+    project = "TCGA-GBM", 
+    data.category = "Transcriptome Profiling",
+    data.type = "Gene Expression Quantification", 
+    workflow.type = "STAR - Counts",
+    sample.type = c("Primary Tumor","Solid Tissue Normal")
+)
+GDCdownload(
+    query = query.exp,
+    files.per.chunk = 100
+)
+
+gbm.exp <- GDCprepare(
+    query = query.exp, 
+    save = TRUE, 
+    save.filename = "gbmExp.rda"
+)
+
+# get subtype information
+infomation.subtype <- TCGAquery_subtype(tumor = "GBM")
+
+# get clinical data
+information.clinical <- GDCquery_clinic(project = "TCGA-GBM",type = "clinical") 
+
+
+```
+
+```{r}
+load("gbmExp.rda")
+
+meta <- colData(data) %>% data.frame %>% 
+  select(definition, race,gender, vital_status,Subtype = paper_Original.Subtype)
+gbm <- SummarizedExperiment(assays=list(counts=assay(data,"unstranded")),
+                     colData=meta)
+
+```
+
