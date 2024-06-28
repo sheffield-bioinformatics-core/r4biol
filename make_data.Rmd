@@ -51,6 +51,28 @@ meta <- colData(data) %>% data.frame %>%
   left_join(subtype) %>% 
   select(patient,shortLetterCode,vital_status,age_at_initial_pathologic_diagnosis,BRCA_Subtype_PAM50,pathologic_stage,BRCA_Pathology,days_to_death,days_to_last_followup) %>% left_join(clin)
 
+
+
+## find which IDs can be mapped to SYMBOLs
+
+library(org.Hs.eg.db)
+
+df <- data.frame(id = rownames(data)) %>% 
+  tidyr::separate(id, into = c("ENSEMBL","Version"),remove = FALSE)
+
+anno <- AnnotationDbi::select(org.Hs.eg.db, 
+                              keys = df$ENSEMBL,
+                              columns = "SYMBOL",
+                              keytype = "ENSEMBL"
+                              )
+
+id_to_use <- left_join(df, anno) %>% 
+  filter(!is.na(SYMBOL)) %>% 
+  pull(id) %>% 
+  unique
+
+data <- data[id_to_use,]
+
 counts <- assay(data,"unstranded") %>% data.frame %>% tibble::rownames_to_column("ENSEMBL")
 
 rownames(meta) <- colnames(counts)[-1]
