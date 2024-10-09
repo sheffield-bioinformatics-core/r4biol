@@ -1,15 +1,5 @@
 # r4biol
 R for Biological Data Analysis
 
-
-Some Ideas:-
-
-## Review of selecting and filtering
-
-## Joining clinical to mutation data
-
-## Get annotation
-
-## PCA of high-throughput data
-
-## Heatmaps
+- Part 1 (R with a biological twist)
+- Part 2 (Tidy RNA-seq)
