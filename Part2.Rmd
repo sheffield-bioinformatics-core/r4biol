@@ -1,6 +1,12 @@
 ---
-title: "Doing a tidy analysis of RNA-seq data"
-output: html_notebook
+title: "R Introduction for RNA-seq"
+author: "Mark Dunning"
+date: '`r format(Sys.time(), "Last modified: %d %b %Y")`'
+output: 
+  html_notebook: 
+    toc: yes
+    toc_float: yes
+    css: stylesheets/styles.css
 ---
 
 We have prepared an RNA-seq dataset uses cases that appeared in The Cancer Genome Atlas (TCGA) breast cancer cohort. It consists of X primary tumours and Y normal tissue samples. The purpose of the tutorial is to
@@ -238,6 +244,7 @@ ids
 ids %>% 
   tidyr::separate(ens_ids, into = c("ENSEMBL","V"))
 ```
+
 ```{r}
 ens_ids <- ids %>% 
   tidyr::separate(ens_ids, into = c("ENSEMBL","V")) %>% 
@@ -271,6 +278,7 @@ brca_t %>%
   filter(SYMBOL == "ESR1") %>% 
   ggplot(aes(x = er_status_by_ihc, y = counts)) + geom_boxplot() + scale_y_log10()
 ```
+
 ## Testing for differential expression
 
 ```{r}
