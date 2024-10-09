@@ -50,7 +50,7 @@ If you get really stuck reading data into R, you can use the Import Dataset opti
 
 The Environment panel of RStudio (top-right) should show that an object called `clinical` has been created. This means that we can start doing analysis this dataset. The choice to call the object `clinical` was ours. We could have used any name instead of `clinical` but we chose something vaguely informative and memorable.
 
-The dimensions of the object should should `7706 obs. of 420 variables`. This means the object we have created contains 7706 rows and 420 columns. Each row is a different observation; in this case a different biological sample. Each column records the value of a different variable. In R's terminology, we have just created a `tibble` which is a special case of something called a `data.frame`. We will see the the object can contain either numbers or text in each column.
+The dimensions of the object should should `7706 obs. of 420 variables`. This means the object we have created contains 7706 rows and 420 columns. Each row is a different observation; in this case a different biological sample. Each column records the value of a different variable. In R's terminology, we have just created a `tibble` which is a special case of something called a `data.frame`. As we will see the the object can contain either numbers or text in each column.
 
 RStudio has a browsing functionality available that we can activate using the `View` function
 
@@ -62,7 +62,7 @@ Observations that are missing are indicated by an `NA`. It may look at first gla
 
 # Data Exploration
 
-We will now start to explore the data with a couple of different questions in mind
+We will now start to explore the data with a couple of different questions in mind:-
 
 - **What are the differences in male/female split between different tumour types?**
 - **Is there a difference in diagnosis age in different tumour types?**
@@ -112,9 +112,9 @@ analysis_data <- select(clinical,
 
 The `select` function only performs the very specific task of letting you choose what columns you want to analyse. After using `select`, our dataset `analysis_data` still has all `r nrow(analysis_data)` rows. 
 
-The function to choose the rows we might be interested in is called `filter`. We have to write a short R command to choose the rows. 
+The function to choose or restrict to the rows we might be interested in is called `filter`. We have to write a short R command to choose the rows. 
 
-e.g. we want only the male samples
+e.g. we want only the male samples. Notice that two "=" signs are required. If you try and use the function with a single "=" R will print a helpful hint. 
 
 ```{r}
 filter(analysis_data, gender == "MALE")
@@ -126,29 +126,42 @@ filter(analysis_data, gender == "FEMALE")
 ```
 
 
-An equivalent, but somewhat unnecessary for this example, way would be to ask for rows where the gender is **not equal** to `MALE`
+An equivalent, but somewhat unnecessary for this example, statement would be to ask for rows where the gender is **not equal** to `MALE`
 
 ```{r}
 filter(analysis_data, gender != "MALE")
 ```
+We can also restrict the data based on numeric columns by using `>`, `<` etc.
+
+```{r}
+filter(analysis_data, age_at_diagnosis > 80)
+```
 
 
-But what if we want males with Brain tumours?
+But what if we want males with Brain tumours? `dplyr` allows us to combine more than one condition if we separate them with a `,`. In computing this is known as an "and" statement and only rows where **both** statements are two will be shown. The line could be extended to include more than two tests if we wanted to. 
 
 ```{r}
 filter(analysis_data, gender == "MALE",tumor_tissue_site == "Brain")
 ```
 
 
-Brain or Lung tumours? Using a `|` symbol instead of a `,` allows for either of two (or more) conditions to be `TRUE`. 
+Brain or Lung tumours? Using a `|` symbol instead of a `,` allows for *either* of two (or more) conditions to be `TRUE`. 
 
 
 ```{r}
 filter(analysis_data, tumor_tissue_site == "Brain" | tumor_tissue_site == "Lung")
 ```
 
+To answer the question of how many males / females have a certain tumour type we could now use R statements such as:-
 
-Although useful for data exploration, it would clearly be inefficient to get gender/tumour type counts in this way. The function `count` can now give us exactly what we want.
+```{r}
+filter(analysis_data, gender == "MALE",tumor_tissue_site == "Brain")
+filter(analysis_data, gender == "FEMALE",tumor_tissue_site == "Brain")
+
+```
+
+and make a note of the number of observations included in the resulting data frame.
+Although useful for data exploration, it would clearly be inefficient to get gender/tumour type counts in this way as we would have to repeat for all combinations of tumour type and gender. The function `count` can now give us exactly what we want.
 
 ```{r}
 count(analysis_data, 
@@ -156,20 +169,27 @@ count(analysis_data,
       gender)
 ```
 
-Before proceeding we probably want to remove any missing observations from the data. These are represented by a `NA` value, which is a special value and not a character label.  
+The `count` function is useful for tabulating the number of observations, but for other summary statistics a more general `sumamrise` function can be used. This can be used in conjunction with the basic summary statistics supported by base R. A summary statistic being something that can be applied to a series of numbers and produce a single number as a result. e.g. the average, minimum, maximum etc.
+
+```{r}
+summarise(analysis_data, 
+          Average = mean(age_at_diagnosis),
+          min = min(age_at_diagnosis),
+          max = max(age_at_diagnosis))
+```
+However, we obviously have a problem due to missing values. If R sees and missing values in a column it will report the mean, minimum or maximum of that column as a missing value. Although this default behaviour can be changes, before proceeding we could also choose to remove any missing observations from the data. These are represented by a `NA` value, which is a special value and not a character label.  
 
 ```{r}
 filter(analysis_data, is.na(age_at_diagnosis) | is.na(tumor_tissue_site))
 ```
 
+We want the opposite of the above; where the age of diagnosis and tumour site is **not** missing. 
 
 ```{r}
 analysis_data <- filter(analysis_data, !is.na(age_at_diagnosis), !is.na(tumor_tissue_site))
 ```
 
-
-
-A similar function can be used on columns containing numeric data when we might want to calculate some of the summary statistics that we saw earlier.
+The summary will now work as expected.
 
 ```{r}
 summarise(analysis_data, 
@@ -178,6 +198,8 @@ summarise(analysis_data,
           max = max(age_at_diagnosis))
 ```
 
+This might not be what we want in all circumstances, as the statistics can also be calculated on a per-tumour site basis. 
+
 ```{r}
 
 data_grouped <- group_by(analysis_data, tumor_tissue_site)
@@ -185,6 +207,43 @@ summarise(data_grouped,Average = mean(age_at_diagnosis),
           min = min(age_at_diagnosis),
           max = max(age_at_diagnosis) )
 ```
+
+
+Further investigation of the data could also involve finding the observations with the maximum or minimum diagnosis age.
+
+```{r}
+## desc specifies descending order
+arrange(analysis_data, desc(age_at_diagnosis))
+```
+```{r}
+arrange(analysis_data, tumor_tissue_site, desc(age_at_diagnosis))
+
+## could also add another sorting variable of gender if we wanted!
+
+```
+
+So far we have used several operations in isolation. However, the real joy (?) of `dplyr` is how different operations can be chained together. Lets say we just wanted female tumours.
+
+```{r}
+filter(analysis_data, gender == "FEMALE")
+```
+
+Our next step could be to remove the `gender` column since it is somewhat redundant.
+
+```{r}
+analysis_data2 <- filter(analysis_data, gender == "FEMALE")
+select(analysis_data2, tumor_tissue_site, age_at_diagnosis)
+## or 
+## select(analysis_data2, -gender)
+```
+
+The code would quickly get cumbersome if we wanted to include additional steps such as removing `NA` values. An alternative approach called "piping" is recommended.
+
+```{r}
+filter(analysis_data, gender == "FEMALE") %>% ## and then...
+  select(tumor_tissue_site, age_at_diagnosis) ## %>% and then...
+```
+
 
 ## Overview of plotting
 
