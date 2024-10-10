@@ -1,0 +1,84 @@
+---
+title: "ML applications in breast cancer"
+output: html_notebook
+---
+
+
+
+## Logistic Regression
+
+```{r}
+data <- readRDS("brca_ESR.rds")
+```
+
+
+```{r}
+library(tidymodels)
+
+set.seed(123)  # Set a seed for reproducibility
+split <- initial_split(data, prop = 0.8)  # Split data into 80% training and 20% testing
+
+train_data <- training(split)
+test_data <- testing(split)
+
+# Specify the model
+glm_spec <- logistic_reg() %>%
+  set_engine("glm") %>%
+  set_mode("classification")
+
+# Fit the model
+glm_fit <- fit(glm_spec, ER_Status ~ ESR1_Level, data = train_data)
+
+glm_fit %>% tidy
+
+```
+
+```{r}
+predict(glm_fit, training_data)
+```
+
+```{r}
+predictions <- predict(glm_fit, test_data) %>% 
+  bind_cols(test_data$ER_Status) %>% 
+  dplyr::rename("Acutal"=2, "Predicted"=1)
+```
+How many times did we get the correct prediction?
+
+```{r}
+count(predictions, Acutal, Predicted)
+```
+
+
+## Decision Tree example
+
+
+```{r}
+# Specify the model
+dt_spec <- decision_tree() %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+# Fit the model
+dt_fit <- fit(dt_spec, ER_Status ~ ESR1_Level, data = train_data)
+# Print the model summary
+library(rpart.plot)
+
+# Visualize the tree
+rpart.plot(dt_fit$fit)
+```
+
+```{r}
+ggplot(data, aes(x = ER_Status, y = ESR1_Level)) + geom_boxplot() + geom_hline(yintercept = 12)
+```
+```{r}
+library(yardstick)
+
+# Assuming you have a fitted model 'dt_fit' and a test dataset 'test_data'
+predictions <- predict(dt_fit, new_data = test_data)
+metrics <- augment(dt_fit, new_data = test_data)
+
+# Calculate accuracy and F1-score
+accuracy(metrics, truth = ER_Status, estimate = .pred_class)
+f1_score(metrics, truth = ER_Status, estimate = .pred_class)
+```
+
