@@ -33,18 +33,18 @@ clin <- read.csv("tcga_brca.clin.csv") %>%
          er_status_by_ihc,
          her2_status_by_ihc,
          pr_status_by_ihc)
-data@colData %>% data.frame %>% View
+
 
 table(data$shortLetterCode)
 ```
 
 ```{r}
 set.seed(270624)
-rand_tumours <- sample(which(data$shortLetterCode == "TP"),50)
+rand_t <- sample(which(data$shortLetterCode == "TP"),20)
 
-rand_normal <- sample(which(data$shortLetterCode == "NT"),50)
+rand_normal <- sample(which(data$shortLetterCode == "NT"),20)
 
-data <- data[,c(rand_tumours,rand_normal)]
+data <- data[,c(rand_t,rand_normal)]
 
 meta <- colData(data) %>% data.frame %>% 
   select(patient, shortLetterCode) %>% 
@@ -73,9 +73,61 @@ id_to_use <- left_join(df, anno) %>%
 
 data <- data[id_to_use,]
 
-counts <- assay(data,"unstranded") %>% data.frame %>% tibble::rownames_to_column("ENSEMBL")
+counts <- assay(data,"unstranded") %>% data.frame %>% 
+  tibble::rownames_to_column("ens") %>% 
+  tidyr::separate(ens, into=c("ENSEMBL","V")) %>% 
+  dplyr::select(-V) %>% 
+  filter(!duplicated(ENSEMBL))
 
 rownames(meta) <- colnames(counts)[-1]
 write.table(counts, "brca_example.tsv",sep = "\t")
 write.table(meta, "brca_example_meta.tsv", sep = "\t")
 ```
+
+## Make ESR1 example for ML
+
+```{r}
+meta <- read.table("brca_example_meta.tsv")
+raw <- read.table("brca_example.tsv")
+counts <- raw[,-1]
+rownames(counts) <- raw$ENSEMBL
+```
+
+```{r}
+library(DESeq2)
+dds <- DESeqDataSetFromMatrix(counts,
+                              meta,
+                              ~er_status_by_ihc)
+```
+
+```{r}
+ids <- data.frame(ens_ids = unique(rownames(dds)))
+ids
+
+ens_ids <- ids %>% 
+  tidyr::separate(ens_ids, into = c("ENSEMBL","V")) %>% 
+  pull(ENSEMBL)
+
+library(org.Hs.eg.db)
+anno <- AnnotationDbi::select(org.Hs.eg.db,
+                              keys = ens_ids,
+                              columns = c("SYMBOL","GENENAME"),
+                              keytype = "ENSEMBL")
+anno
+
+esr1_id <- filter(anno, SYMBOL == "ESR1") %>% pull(ENSEMBL)
+```
+
+```{r}
+vsd <- vst(dds)
+
+ESR1_Level = assay(vsd)[grepl(esr1_id, rownames(vsd)),]
+
+df <- data.frame(ESR1_Level, ER_Status = dds$er_status_by_ihc)
+df
+```
+
+```{r}
+ggplot(df, aes(x= ER_Status, y =ESR1_Level)) + geom_boxplot()
+```
+

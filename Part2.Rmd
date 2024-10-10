@@ -92,7 +92,7 @@ We want the counts for a particular gene, and which sample it is most highly-exp
 
 ```{r}
 brca_tidy %>% 
-  filter(.feature == "ENSG00000000003.15") %>% 
+  filter(.feature == "ENSG00000000003") %>% 
     dplyr::select(counts,patient) %>% 
     arrange(desc(counts))
 ```
@@ -101,7 +101,7 @@ Or calculate the average expression in different groups.
 
 ```{r}
 brca_tidy %>% 
-  filter(.feature == "ENSG00000000003.15") %>% 
+  filter(.feature == "ENSG00000000003") %>% 
     group_by(shortLetterCode) %>% 
     summarise(mean(counts))
 ```
@@ -122,7 +122,7 @@ The above were examples of using the standard `tidyverse` operations. The `tidyb
 > Genes with very low counts across all libraries provide little evidence for differential expression and they can interfere with some of the statistical approximations that are used later in the pipeline. They also add to the multiple testing burden when estimating false discovery rates, reducing power to detect differentially expressed genes. These genes should be filtered out prior to further analysis. We can perform the filtering using tidybulk keep_abundant or identify_abundant. These functions can use the edgeR filterByExpr function described in (Law et al. 2016) to automatically identify the genes with adequate abundance for differential expression testing. By default, this will keep genes with ~10 counts in a minimum number of samples, the number of the samples in the smallest group. 
 
 ```{r}
-counts_filtered <- brca_tidy %>% keep_abundant(factor_of_interest=BRCA_Subtype_PAM50)
+counts_filtered <- brca_tidy %>% keep_abundant(factor_of_interest=er_status_by_ihc)
 counts_filtered
 ```
 
@@ -202,56 +202,33 @@ counts_scal_PCA %>%
 
 ```
 
-We will now concentrate on the analysis of the tumour samples only, but save the whole object for later sections.
+
+
+We will now concentrate on the analysis of the tumour samples only, but save the whole object for later sections. To reduce the amount of memory usage we will also remove the scaled counts. 
 
 ```{r}
 saveRDS(brca_tidy, "data/brca_tidy.RDS")
 rm(brca_tidy)
+rm(counts_scal_PCA)
+rm(counts_scaled)
+
 ```
+
+
 
 ## Gene Annotations
 
-If we haven't seen so already, the biggest source of variation is whether a tumour is *estrogen receptor* positive or not. 
 
-A useful sanity check is whether the estrogen receptor gene *ESR1* shows a difference in expression between groups. But looking at our data, how do we know which counts correspond to ESR1?
-
-```{r}
-brca_t
-```
-
-At the moment we don't know what values to use. All we have is an Ensembl ID, and not a more recognisable naming scheme. Fortunately, we have ways to convert between.
+At the moment we don't have particularly meaningful gene names that we can use. We have an Ensembl ID, and have ways to convert between. One of which is using an organism-specific package in Bioconductor. First, we get all the IDs we have.
 
 ```{r}
-ens_ids <- pull(brca_t, .feature)
+ens_ids <- pull(counts_filtered, .feature) %>% unique
 ```
 
+The overall strategy is to use `org.Hs.eg.db` to convert between one type of ID (ENSEMBL in our case) to another. We can try the official gene symbol and gene name. For non-human data, equivalent packages are available. e.g. `org.Mm.eg.db` for mouse.
 
-```{r eval=FALSE}
-## This is expected to give an error
-
+```{r}
 library(org.Hs.eg.db)
-AnnotationDbi::select(org.Hs.eg.db,
-                      keys = ens_ids,
-                      columns = c("SYMBOL", "GENENAME"),
-                      keytype = "ENSEMBL")
-```
-```{r}
-ids <- data.frame(ens_ids = unique(ens_ids))
-ids
-```
-
-```{r}
-ids %>% 
-  tidyr::separate(ens_ids, into = c("ENSEMBL","V"))
-```
-
-```{r}
-ens_ids <- ids %>% 
-  tidyr::separate(ens_ids, into = c("ENSEMBL","V")) %>% 
-  pull(ENSEMBL)
-``` 
-
-```{r}
 anno <- AnnotationDbi::select(org.Hs.eg.db,
                               keys = ens_ids,
                               columns = c("SYMBOL","GENENAME"),
@@ -259,31 +236,12 @@ anno <- AnnotationDbi::select(org.Hs.eg.db,
 anno
 ```
 
-```{r}
-brca_t <- brca_t %>% 
-  tidyr::separate(.feature, into=c("ENSEMBL","V")) %>% 
-  left_join(anno, by="ENSEMBL") %>% 
-  dplyr::select(-V)
-```
 
-
-```{r}
-brca_t %>% 
-  dplyr::select(1:3, last_col(),last_col(1))
-```
-We can now query the ESR1 gene, and thankfully it shows a huge difference
-
-```{r}
-brca_t %>% 
-  filter(SYMBOL == "ESR1") %>% 
-  ggplot(aes(x = er_status_by_ihc, y = counts)) + geom_boxplot() + scale_y_log10()
-```
 
 ## Testing for differential expression
 
-```{r}
-counts_filtered
-```
+The `tidybulk` package has simplified workflows to test for differential expression between different conditions. The workflow is not completely automated however because we still need to specify what sample groups to compare and which contrasts to make. This is achieved via the `.formula` argument. The `.contrasts` argument also allows us to explictly define the *direction* of the contrast and which group to use as a baseline; which will affect the sign of the fold-change.
+
 
 
 ```{r}
@@ -291,16 +249,32 @@ counts_de <- counts_filtered %>%
   filter(er_status_by_ihc %in% c("Positive","Negative")) %>% 
     test_differential_abundance(
       .formula = ~ 0 + er_status_by_ihc,
-      .contrasts = c("er_status_by_ihcPositive - er_status_by_ihcNegative")
+      method = "deseq2",
+      .contrasts = list(c("er_status_by_ihc", "Positive","Negative"))
+      ,omit_contrast_in_colnames = TRUE
     )
 ```
 
+The results are still in a *long* format table. This is actually not very helpful, and would prefer to have a single row for each gene tested. The function `pivot_transcript` performs the reshaping. We can now add the gene annotation we created earlier, but retain the original Ensembl IDs so we can retrieve count information.
+
+The final `arrange` orders by significance.
+
 ```{r}
-counts_de %>% pivot_transcript() %>% View
+results_table <- counts_de %>% 
+  pivot_transcript() %>% 
+  left_join(anno, by=c(".feature"="ENSEMBL")) %>% 
+  dplyr::select(-shortLetterCode,-.abundant) %>%
+  arrange(padj)
+results_table
+```
 
+A volcano plot is a common visualisation that shows the degree of significance and magnitude of change. It would be perfectly possible to make the plot using standard `ggplot2` code. However, the `EnhancedVolcano` package simplifies the process and offers some additional features
 
-counts_de %>%
-    pivot_transcript() %>%
-    write_tsv("de_results.tsv")
+```{r}
+library(EnhancedVolcano)
+EnhancedVolcano(results_table, 
+                lab = results_table$SYMBOL,
+                x = "log2FoldChange",
+                y = "padj")
 ```
 
