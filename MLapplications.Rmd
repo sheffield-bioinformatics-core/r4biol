@@ -3,20 +3,42 @@ title: "ML applications in breast cancer"
 output: html_notebook
 ---
 
+## Context
+
+Breast cancer is used here an example application of machine learning due to several key factors:
+
+- Large Datasets: There are extensive datasets available for breast cancer research, including gene expression data, clinical information, and patient outcomes. These large datasets provide ample data for training and evaluating machine learning models.
+
+- Complex Relationships: Breast cancer is a complex disease with multiple factors influencing its development and progression. Machine learning algorithms can effectively identify intricate patterns and relationships within the data that might not be apparent to human analysis.
+
+- Personalized Treatment: Machine learning can assist in developing personalized treatment plans by identifying patient subgroups with similar characteristics and predicting their response to different therapies.
+
+The first example will consider the *ER status* of a tumour. ER Status (Estrogen Receptor Status) is a crucial factor in breast cancer. It refers to the presence or absence of estrogen receptors on breast cancer cells.
+
+- ER-Positive: If breast cancer cells have estrogen receptors, they are considered ER-positive. These cells are sensitive to estrogen, and the hormone can stimulate their growth.
+- ER-Negative: If breast cancer cells do not have estrogen receptors, they are considered ER-negative. These cells are less likely to be influenced by estrogen.
+
+ER status is traditionally measured using immunohistochemistry (IHC). In IHC, a tissue sample from the breast tumor is treated with antibodies that specifically bind to estrogen receptors. If the antibodies bind to the tumor cells, it indicates the presence of estrogen receptors, making the tumor ER-positive.
+
+**Can we use Machine learning to classify the ER status of a tumour based on omics data?** For this we will use a version of the TCGA dataset that has been processed to include various RNA-seq measurements from a set of genes, along with clinical characteristics of patients.
 
 
 ## Logistic Regression
 
 ```{r}
-data <- readRDS("brca_ESR.rds")
+data <- readRDS("brca_ML_example.rds")
+glimpse(data)
 ```
 
 
 ```{r}
 library(tidymodels)
 
+data_er <- filter(data, er_status_by_ihc %in% c("Positive","Negative")) %>% 
+  rename(er_status_by_ihc = "ER_Status") %>% 
+  mutate(ER_Status = as.factor(ER_Status))
 set.seed(123)  # Set a seed for reproducibility
-split <- initial_split(data, prop = 0.8)  # Split data into 80% training and 20% testing
+split <- initial_split(data_er, prop = 0.8)  # Split data into 80% training and 20% testing
 
 train_data <- training(split)
 test_data <- testing(split)
@@ -27,27 +49,48 @@ glm_spec <- logistic_reg() %>%
   set_mode("classification")
 
 # Fit the model
-glm_fit <- fit(glm_spec, ER_Status ~ ESR1_Level, data = train_data)
+glm_fit <- fit(glm_spec, ER_Status ~ ESR1, data = train_data)
 
 glm_fit %>% tidy
 
 ```
 
 ```{r}
-predict(glm_fit, training_data)
+# Predict classes on the test set
+predictions <- predict(glm_fit, new_data = test_data, type = "class")
+
+# Create a data frame with actual and predicted values
+results <- bind_cols(test_data, predictions)
+## how many were correct?
+dplyr::count(results, ER_Status, .pred_class)
 ```
+
+
 
 ```{r}
-predictions <- predict(glm_fit, test_data) %>% 
-  bind_cols(test_data$ER_Status) %>% 
-  dplyr::rename("Acutal"=2, "Predicted"=1)
+
+# Calculate metrics
+accuracy(results, truth = ER_Status, estimate = .pred_class)
+precision(results, truth = ER_Status, estimate = .pred_class)
+recall(results, truth = ER_Status, estimate = .pred_class)
+f_meas(results, truth = ER_Status, estimate = .pred_class)
+
+# Visualize predicted classes
+ggplot(results, aes(x = ESR1, y = .pred_class,col=ER_Status)) +
+  geom_jitter(height=0.1) +
+  labs(x = "ESR1 Expression", y = "Predicted Probability of ER-Positive") 
 ```
-How many times did we get the correct prediction?
+
 
 ```{r}
-count(predictions, Acutal, Predicted)
-```
+prob_predictions <- predict(glm_fit, new_data = test_data, type = "prob") 
+prob_results <- bind_cols(test_data, prob_predictions) %>% 
+  dplyr::select(ER_Status,ESR1,last_col(),last_col(1)) %>% 
+  pivot_longer(contains(".pred"), values_to = "Prob",names_to = "Class")
 
+ggplot(prob_results, aes(x = ESR1, y = Prob,col=Class)) + geom_point()
+
+```
 
 ## Decision Tree example
 
@@ -59,26 +102,63 @@ dt_spec <- decision_tree() %>%
   set_mode("classification")
 
 # Fit the model
-dt_fit <- fit(dt_spec, ER_Status ~ ESR1_Level, data = train_data)
+dt_fit <- fit(dt_spec, ER_Status ~ ESR1, data = train_data)
 # Print the model summary
+dt_fit
+```
+```{r}
 library(rpart.plot)
 
 # Visualize the tree
 rpart.plot(dt_fit$fit)
 ```
 
+
 ```{r}
-ggplot(data, aes(x = ER_Status, y = ESR1_Level)) + geom_boxplot() + geom_hline(yintercept = 12)
+ggplot(train_data, aes(x = ER_Status, y = ESR1)) + geom_boxplot() + geom_hline(yintercept = 12)
 ```
+
 ```{r}
 library(yardstick)
 
-# Assuming you have a fitted model 'dt_fit' and a test dataset 'test_data'
-predictions <- predict(dt_fit, new_data = test_data)
+predictions <- predict(dt_fit, new_data = test_data,type="class")
 metrics <- augment(dt_fit, new_data = test_data)
+
 
 # Calculate accuracy and F1-score
 accuracy(metrics, truth = ER_Status, estimate = .pred_class)
-f1_score(metrics, truth = ER_Status, estimate = .pred_class)
+precision(results, truth = ER_Status, estimate = .pred_class)
+recall(results, truth = ER_Status, estimate = .pred_class)
+f_meas(results, truth = ER_Status, estimate = .pred_class)
+
 ```
+
+
+```{r}
+dt_spec <- decision_tree() %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+# Fit the model
+dt_fit <- fit(dt_spec, ER_Status ~ ., data = train_data)
+# Print the model summary
+dt_fit
+```
+
+```{r}
+# Visualize the tree
+rpart.plot(dt_fit$fit)
+```
+
+
+```{r}
+accuracy(results, truth = ER_Status, estimate = .pred_class)
+f_meas(results, truth = ER_Status, estimate = .pred_class)
+
+```
+
+```{r}
+vip(dt_fit)
+```
+
 
