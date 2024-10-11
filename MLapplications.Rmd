@@ -27,7 +27,7 @@ ER status is traditionally measured using immunohistochemistry (IHC). In IHC, a 
 
 ```{r}
 data <- readRDS("brca_ML_example.rds")
-glimpse(data)
+data 
 ```
 
 
@@ -35,8 +35,9 @@ glimpse(data)
 library(tidymodels)
 
 data_er <- filter(data, er_status_by_ihc %in% c("Positive","Negative")) %>% 
-  rename(er_status_by_ihc = "ER_Status") %>% 
+  dplyr::rename(ER_Status = er_status_by_ihc) %>% 
   mutate(ER_Status = as.factor(ER_Status))
+
 set.seed(123)  # Set a seed for reproducibility
 split <- initial_split(data_er, prop = 0.8)  # Split data into 80% training and 20% testing
 
@@ -70,10 +71,11 @@ dplyr::count(results, ER_Status, .pred_class)
 ```{r}
 
 # Calculate metrics
-accuracy(results, truth = ER_Status, estimate = .pred_class)
-precision(results, truth = ER_Status, estimate = .pred_class)
-recall(results, truth = ER_Status, estimate = .pred_class)
-f_meas(results, truth = ER_Status, estimate = .pred_class)
+Metric_Summary <- data.frame(Accuracy = accuracy(results, truth = ER_Status, estimate = .pred_class)$.estimate, 
+                  Precision=precision(results, truth = ER_Status, estimate = .pred_class)$.estimate,
+                  Recall = recall(results, truth = ER_Status, estimate = .pred_class)$.estimate,
+                  F1 = f_meas(results, truth = ER_Status, estimate = .pred_class)$.estimate,
+                  Method = "Logistic Regression")
 
 # Visualize predicted classes
 ggplot(results, aes(x = ESR1, y = .pred_class,col=ER_Status)) +
@@ -125,19 +127,22 @@ predictions <- predict(dt_fit, new_data = test_data,type="class")
 metrics <- augment(dt_fit, new_data = test_data)
 
 
-# Calculate accuracy and F1-score
-accuracy(metrics, truth = ER_Status, estimate = .pred_class)
-precision(results, truth = ER_Status, estimate = .pred_class)
-recall(results, truth = ER_Status, estimate = .pred_class)
-f_meas(results, truth = ER_Status, estimate = .pred_class)
 
+# Calculate metrics
+Metric_Summary <- bind_rows(Metric_Summary, data.frame(Accuracy = accuracy(metrics, truth = ER_Status, estimate = .pred_class)$.estimate, 
+                  Precision=precision(metrics, truth = ER_Status, estimate = .pred_class)$.estimate,
+                  Recall = recall(metrics, truth = ER_Status, estimate = .pred_class)$.estimate,
+                  F1 = f_meas(metrics, truth = ER_Status, estimate = .pred_class)$.estimate,
+                  Method = "Decision Tree")
+)
+
+Metric_Summary
 ```
-
+## Adding more predictors
 
 ```{r}
-dt_spec <- decision_tree() %>%
-  set_engine("rpart") %>%
-  set_mode("classification")
+train_data <- select(train_data, ACTR3B:UBE2T,ER_Status)
+test_data <- select(test_data, ACTR3B:UBE2T,ER_Status)
 
 # Fit the model
 dt_fit <- fit(dt_spec, ER_Status ~ ., data = train_data)
@@ -152,13 +157,21 @@ rpart.plot(dt_fit$fit)
 
 
 ```{r}
-accuracy(results, truth = ER_Status, estimate = .pred_class)
-f_meas(results, truth = ER_Status, estimate = .pred_class)
+predictions <- predict(dt_fit, new_data = test_data,type="class")
+metrics <- augment(dt_fit, new_data = test_data)
 
+# Calculate metrics
+Metric_Summary <- bind_rows(Metric_Summary, data.frame(Accuracy = accuracy(metrics, truth = ER_Status, estimate = .pred_class)$.estimate, 
+                  Precision=precision(metrics, truth = ER_Status, estimate = .pred_class)$.estimate,
+                  Recall = recall(metrics, truth = ER_Status, estimate = .pred_class)$.estimate,
+                  F1 = f_meas(metrics, truth = ER_Status, estimate = .pred_class)$.estimate,
+                  Method = "Decision Tree 2")
+)
+Metric_Summary
 ```
 
 ```{r}
+library(vip)
 vip(dt_fit)
 ```
-
-
+## Trying a random forest

@@ -132,23 +132,25 @@ id_to_use <- left_join(df, anno) %>%
 data <- data[id_to_use,]
 
 library(DESeq2)
+library(genefu)
 dds <- DESeqDataSetFromMatrix(assay(data, "unstranded"),
                               meta,
                               ~1)
 
 vsd <- vst(dds)
 
-genes_to_use <- c("ESR1", "ERBB2","PGR","CCND1","MYC","TP53","BRCA1","BRCA2")
+genes_to_use <- rownames(pam50$centroids.map)
 anno <- AnnotationDbi::select(org.Hs.eg.db, 
                       keys = genes_to_use,
                       columns = "ENSEMBL",
                       keytype =  "SYMBOL") 
-ens_ids <- pull(anno,"ENSEMBL")
+ens_ids <- pull(anno,"ENSEMBL") %>% na.omit()
 
 tmp <- data.frame(ens = rownames(vsd)) %>% 
   tidyr::separate(ens,into=c("ENSEMBL","V"),remove = FALSE)
-
 rownames(vsd) <- tmp$ENSEMBL  
+
+ens_ids <- ens_ids[ens_ids %in% rownames(vsd)]
 norm_data <- assay(vsd)[ens_ids,] %>% 
   data.frame() %>% 
   tibble::rownames_to_column("ENSEMBL") %>% 
@@ -159,7 +161,7 @@ norm_data <- assay(vsd)[ens_ids,] %>%
 
 export_data <- bind_cols(norm_data, meta) %>% 
   filter(shortLetterCode == "TP")
-rownames(meta) <- colnames(counts)[-1]
-write.table(counts, "brca_example.tsv",sep = "\t")
-write.table(meta, "brca_example_meta.tsv", sep = "\t")
+
+saveRDS(export_data, "brca_ML_example.rds")
+
 ```
