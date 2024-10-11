@@ -97,8 +97,7 @@ clin <- read.csv("tcga_brca.clin.csv") %>%
          er_status_by_ihc,
          her2_status_by_ihc,
          pr_status_by_ihc,
-         ethnicity,
-         metastasis_site)
+         ethnicity)
 
 ```
 
@@ -107,7 +106,7 @@ clin <- read.csv("tcga_brca.clin.csv") %>%
 meta <- colData(data) %>% data.frame %>% 
   dplyr::select(patient, shortLetterCode) %>% 
   left_join(subtype) %>% 
-  dplyr::select(patient,shortLetterCode,vital_status,age_at_initial_pathologic_diagnosis,BRCA_Subtype_PAM50,pathologic_stage,BRCA_Pathology,days_to_death,days_to_last_followup) %>% left_join(clin)
+  dplyr::select(patient,shortLetterCode,vital_status,age_at_initial_pathologic_diagnosis,BRCA_Subtype_PAM50,pathologic_stage,BRCA_Pathology,days_to_death,days_to_last_followup,pathologic_stage) %>% left_join(clin)
 
 
 
@@ -133,6 +132,9 @@ data <- data[id_to_use,]
 
 library(DESeq2)
 library(genefu)
+data("pam50")
+## read the data but don't need a proper design
+
 dds <- DESeqDataSetFromMatrix(assay(data, "unstranded"),
                               meta,
                               ~1)
