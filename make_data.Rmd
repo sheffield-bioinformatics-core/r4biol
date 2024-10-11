@@ -86,48 +86,80 @@ write.table(meta, "brca_example_meta.tsv", sep = "\t")
 
 ## Make ESR1 example for ML
 
+
 ```{r}
-meta <- read.table("brca_example_meta.tsv")
-raw <- read.table("brca_example.tsv")
-counts <- raw[,-1]
-rownames(counts) <- raw$ENSEMBL
+library(dplyr)
+library(SummarizedExperiment)
+load("brcaExp.rda")
+subtype <- read.csv('information_subtype.csv')
+clin <- read.csv("tcga_brca.clin.csv") %>% 
+  dplyr::select(patient = bcr_patient_barcode,
+         er_status_by_ihc,
+         her2_status_by_ihc,
+         pr_status_by_ihc,
+         ethnicity,
+         metastasis_site)
+
 ```
 
 ```{r}
-library(DESeq2)
-dds <- DESeqDataSetFromMatrix(counts,
-                              meta,
-                              ~er_status_by_ihc)
-```
 
-```{r}
-ids <- data.frame(ens_ids = unique(rownames(dds)))
-ids
+meta <- colData(data) %>% data.frame %>% 
+  dplyr::select(patient, shortLetterCode) %>% 
+  left_join(subtype) %>% 
+  dplyr::select(patient,shortLetterCode,vital_status,age_at_initial_pathologic_diagnosis,BRCA_Subtype_PAM50,pathologic_stage,BRCA_Pathology,days_to_death,days_to_last_followup) %>% left_join(clin)
 
-ens_ids <- ids %>% 
-  tidyr::separate(ens_ids, into = c("ENSEMBL","V")) %>% 
-  pull(ENSEMBL)
+
+
+## find which IDs can be mapped to SYMBOLs
 
 library(org.Hs.eg.db)
-anno <- AnnotationDbi::select(org.Hs.eg.db,
-                              keys = ens_ids,
-                              columns = c("SYMBOL","GENENAME"),
-                              keytype = "ENSEMBL")
-anno
 
-esr1_id <- filter(anno, SYMBOL == "ESR1") %>% pull(ENSEMBL)
-```
+df <- data.frame(id = rownames(data)) %>% 
+  tidyr::separate(id, into = c("ENSEMBL","Version"),remove = FALSE)
 
-```{r}
+anno <- AnnotationDbi::select(org.Hs.eg.db, 
+                              keys = df$ENSEMBL,
+                              columns = "SYMBOL",
+                              keytype = "ENSEMBL"
+                              )
+
+id_to_use <- left_join(df, anno) %>% 
+  filter(!is.na(SYMBOL)) %>% 
+  pull(id) %>% 
+  unique
+
+data <- data[id_to_use,]
+
+library(DESeq2)
+dds <- DESeqDataSetFromMatrix(assay(data, "unstranded"),
+                              meta,
+                              ~1)
+
 vsd <- vst(dds)
 
-ESR1_Level = assay(vsd)[grepl(esr1_id, rownames(vsd)),]
+genes_to_use <- c("ESR1", "ERBB2","PGR","CCND1","MYC","TP53","BRCA1","BRCA2")
+anno <- AnnotationDbi::select(org.Hs.eg.db, 
+                      keys = genes_to_use,
+                      columns = "ENSEMBL",
+                      keytype =  "SYMBOL") 
+ens_ids <- pull(anno,"ENSEMBL")
 
-df <- data.frame(ESR1_Level, ER_Status = dds$er_status_by_ihc)
-df
+tmp <- data.frame(ens = rownames(vsd)) %>% 
+  tidyr::separate(ens,into=c("ENSEMBL","V"),remove = FALSE)
+
+rownames(vsd) <- tmp$ENSEMBL  
+norm_data <- assay(vsd)[ens_ids,] %>% 
+  data.frame() %>% 
+  tibble::rownames_to_column("ENSEMBL") %>% 
+  tidyr::pivot_longer(-ENSEMBL, names_to = "SAMPLE",values_to = "COUNT") %>% 
+  left_join(anno) %>% 
+  dplyr::select(-ENSEMBL) %>% 
+  tidyr::pivot_wider(everything(), names_from = SYMBOL,values_from = COUNT)
+
+export_data <- bind_cols(norm_data, meta) %>% 
+  filter(shortLetterCode == "TP")
+rownames(meta) <- colnames(counts)[-1]
+write.table(counts, "brca_example.tsv",sep = "\t")
+write.table(meta, "brca_example_meta.tsv", sep = "\t")
 ```
-
-```{r}
-ggplot(df, aes(x= ER_Status, y =ESR1_Level)) + geom_boxplot()
-```
-

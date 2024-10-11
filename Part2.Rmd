@@ -54,7 +54,7 @@ If we want to know more information about the biological samples we have to use 
 ```{r}
 colData(brca) %>% 
   data.frame %>% 
-  select(1:4)
+  dplyr::select(1:4)
 ```
 The format is not immediately accessible to those familiar with a "`tidyverse`" mindset. Mainly because the data are "wide" and not "long". Consider the code to visualise the distribution of each sample as a boxplot (which is a common QC task)
 
@@ -211,7 +211,7 @@ saveRDS(brca_tidy, "data/brca_tidy.RDS")
 rm(brca_tidy)
 rm(counts_scal_PCA)
 rm(counts_scaled)
-
+rm(brca_t)
 ```
 
 
@@ -248,16 +248,14 @@ The `tidybulk` package has simplified workflows to test for differential express
 counts_de <- counts_filtered %>% 
   filter(er_status_by_ihc %in% c("Positive","Negative")) %>% 
     test_differential_abundance(
-      .formula = ~ 0 + er_status_by_ihc,
+      .formula = ~ er_status_by_ihc,
       method = "deseq2",
       .contrasts = list(c("er_status_by_ihc", "Positive","Negative"))
       ,omit_contrast_in_colnames = TRUE
     )
 ```
 
-The results are still in a *long* format table. This is actually not very helpful, and would prefer to have a single row for each gene tested. The function `pivot_transcript` performs the reshaping. We can now add the gene annotation we created earlier, but retain the original Ensembl IDs so we can retrieve count information.
-
-The final `arrange` orders by significance.
+The results are still in a *long* format table. This is actually not very helpful, and would prefer to have a single row for each gene tested. The function `pivot_transcript` performs the reshaping. We can now add the gene annotation we created earlier, but retain the original Ensembl IDs so we can retrieve count information. The final `arrange` line orders by significance.
 
 ```{r}
 results_table <- counts_de %>% 
@@ -266,9 +264,13 @@ results_table <- counts_de %>%
   dplyr::select(-shortLetterCode,-.abundant) %>%
   arrange(padj)
 results_table
+
+rm(counts_de)
 ```
 
-A volcano plot is a common visualisation that shows the degree of significance and magnitude of change. It would be perfectly possible to make the plot using standard `ggplot2` code. However, the `EnhancedVolcano` package simplifies the process and offers some additional features
+A volcano plot is a common visualisation that shows the degree of significance and magnitude of change. Genes of biological significance are likely to be those with  low p-value and more extreme fold-change.
+
+It would be perfectly possible to make the plot using standard `ggplot2` code. However, the `EnhancedVolcano` package simplifies the process and offers some additional features such as automatically labelling the significant genes.
 
 ```{r}
 library(EnhancedVolcano)
@@ -276,5 +278,28 @@ EnhancedVolcano(results_table,
                 lab = results_table$SYMBOL,
                 x = "log2FoldChange",
                 y = "padj")
+```
+
+Some "sanity checks" are always a good idea too. This can include visualising the scaled counts of the top genes to see if their significance is driven by biological effects, and not technical. First we get the names of the most significant genes. The names have to be in ensembl format as we are going to retrive information on these from the counts data - which has ensembl as an identifier.
+
+```{r}
+N <- 10
+top_genes <- slice_head(results_table, n=N) %>% pull(.feature)
+top_genes
+```
+We have to repeat the scaling as we removed the object. The annotation information is include to allow more meaningful labels.
+
+```{r}
+plot_data <- counts_filtered %>% 
+  scale_abundance() %>% 
+  filter(.feature %in% top_genes) %>% 
+  left_join(anno, by = c(".feature" = "ENSEMBL"))
+plot_data
+```
+A series of boxplots can now be created, with a facet introduced so that a separate plot is made for each gene.
+
+```{r}
+plot_data %>% 
+  ggplot(aes(x = er_status_by_ihc, y = counts_scaled,fill=er_status_by_ihc)) + geom_boxplot() + scale_y_log10() + facet_wrap(~SYMBOL)
 ```
 
