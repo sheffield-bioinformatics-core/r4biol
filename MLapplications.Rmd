@@ -192,126 +192,33 @@ vip(dt_fit)
 
 ## Trying a random forest
 
+
 ```{r}
 # Specify the random forest model
-
-my_rec <- recipe(ER_Status ~., data = train_data)
-
-my_prep <- prep(my_rec)
-juiced <- juice(my_prep)
-
-tune_spec <- rand_forest(
-  mtry = tune(),
-  trees = 1000,
-  min_n = tune()
+rf_spec <- rand_forest(
+  trees = 500
 ) %>%
-  set_mode("classification") %>%
-  set_engine("ranger")
+  set_engine("ranger") %>%
+  set_mode("classification")  # Replace "classification" with "regression" for regression tasks
 
-tune_wf <- workflow() %>%
-  add_recipe(my_rec) %>%
-  add_model(tune_spec)
+# Fit the model
+rf_fit <- fit(rf_spec, formula = ER_Status ~ ., data = train_data)
 
-```
+# Make predictions
+predictions <- predict(rf_fit, new_data = test_data)
 
+metrics <- augment(rf_fit, new_data = test_data)
 
-```{r}
-set.seed(234)
-train_folds <- vfold_cv(train_data)
-
-doParallel::registerDoParallel()
-
-set.seed(345)
-tune_res <- tune_grid(
-  tune_wf,
-  resamples = train_folds,
-  grid = 20
-)
-
-tune_res
-
-```
-```{r}
-tune_res %>%
-  collect_metrics() %>%
-  filter(.metric == "roc_auc") %>%
-  dplyr::select(mean, min_n, mtry) %>%
-  pivot_longer(min_n:mtry,
-    values_to = "value",
-    names_to = "parameter"
-  ) %>%
-  ggplot(aes(value, mean, color = parameter)) +
-  geom_point(show.legend = FALSE) +
-  facet_wrap(~parameter, scales = "free_x") +
-  labs(x = NULL, y = "AUC")
-```
-
-```{r}
-rf_grid <- grid_regular(
-  mtry(range = c(10, 20)),
-  min_n(range = c(2, 8)),
-  levels = 5
-)
-
-rf_grid
-```
-
-```{r}
-set.seed(456)
-regular_res <- tune_grid(
-  tune_wf,
-  resamples = train_folds,
-  grid = rf_grid
-)
-
-regular_res
-```
-
-```{r}
-regular_res %>%
-  collect_metrics() %>%
-  filter(.metric == "roc_auc") %>%
-  mutate(min_n = factor(min_n)) %>%
-  ggplot(aes(mtry, mean, color = min_n)) +
-  geom_line(alpha = 0.5, size = 1.5) +
-  geom_point() +
-  labs(y = "AUC")
-```
-
-
-```{r}
-best_auc <- select_best(regular_res, metric = "roc_auc")
-
-final_rf <- finalize_model(
-  tune_spec,
-  best_auc
-)
-
-final_rf
-```
-
-```{r}
-library(vip)
-
-final_rf %>%
-  set_engine("ranger", importance = "permutation") %>%
-  fit(ER_Status ~ .,
-    data = juice(tree_prep)
-  ) %>%
-  vip(geom = "point")
-```
-
-
-```{r}
-predictions <- predict(wf_fit, new_data = test_data)
-metrics <- augment(wf_fit, new_data = test_data)
-
+# Calculate metrics
 Metric_Summary <- bind_rows(Metric_Summary, data.frame(Accuracy = accuracy(metrics, truth = ER_Status, estimate = .pred_class)$.estimate, 
                   Precision=precision(metrics, truth = ER_Status, estimate = .pred_class)$.estimate,
                   Recall = recall(metrics, truth = ER_Status, estimate = .pred_class)$.estimate,
                   F1 = f_meas(metrics, truth = ER_Status, estimate = .pred_class)$.estimate,
-                  Method = "Random Forest"))
-                  
+                  Method = "Random Forest")
+)
+Metric_Summary
+
 ```
+
 
 
