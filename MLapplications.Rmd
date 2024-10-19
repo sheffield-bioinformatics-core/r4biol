@@ -23,7 +23,10 @@ ER status is traditionally measured using immunohistochemistry (IHC). In IHC, a 
 **Can we use Machine learning to classify the ER status of a tumour based on omics data?** For this we will use a version of the TCGA dataset that has been processed to include various RNA-seq measurements from a set of genes, along with clinical characteristics of patients.
 
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 0f2eee3d1ed66cd075fb8a08b8d65115e157328c
 ```{r}
 data <- readRDS("brca_ML_example.rds")
 data 
@@ -31,19 +34,31 @@ data
 ## Logistic Regression
 
 
+## Logistic Regression
+
+First we prepare the data ready for analysis. To make the classification easier we will just use ER positive or negative samples (some of samples are undefined).
+
 ```{r}
 library(tidymodels)
 
 data_er <- filter(data, er_status_by_ihc %in% c("Positive","Negative")) %>% 
   dplyr::rename(ER_Status = er_status_by_ihc) %>% 
   mutate(ER_Status = as.factor(ER_Status))
+```
 
+We always split the data into training and test sets; with more samples allocated to training.
+
+```{r}
 set.seed(123)  # Set a seed for reproducibility
-split <- initial_split(data_er, prop = 0.8)  # Split data into 80% training and 20% testing
+split <- initial_split(data_er, prop = 0.8,strata = ER_Status)  # Split data into 80% training and 20% testing
 
 train_data <- training(split)
 test_data <- testing(split)
+```
 
+Define the model and fit
+
+```{r}
 # Specify the model
 glm_spec <- logistic_reg() %>%
   set_engine("glm") %>%
@@ -56,6 +71,8 @@ glm_fit %>% tidy
 
 ```
 
+We want to use the model to make predictions using the test data - which importantly was not used during the training step. Since we know the true labels we can test how effective our model is. A simple check is to compare the predicted classes side-by-side to the actual classes.
+
 ```{r}
 # Predict classes on the test set
 predictions <- predict(glm_fit, new_data = test_data, type = "class")
@@ -66,23 +83,26 @@ results <- bind_cols(test_data, predictions)
 dplyr::count(results, ER_Status, .pred_class)
 ```
 
-
+We can more formally assess the model using a series of metrics provided by the `yardstick` package. We'll save these results to a data frame so we can compare between different models.
 
 ```{r}
-
 # Calculate metrics
 Metric_Summary <- data.frame(Accuracy = accuracy(results, truth = ER_Status, estimate = .pred_class)$.estimate, 
                   Precision=precision(results, truth = ER_Status, estimate = .pred_class)$.estimate,
                   Recall = recall(results, truth = ER_Status, estimate = .pred_class)$.estimate,
                   F1 = f_meas(results, truth = ER_Status, estimate = .pred_class)$.estimate,
                   Method = "Logistic Regression")
+Metric_Summary
+```
+Some insight into the model can be gained by plotting the classifications against the values of ESR1. At a certain cut-off on ESR1, the model decides to call a tumour as ER positive.
 
+```{r}
 # Visualize predicted classes
 ggplot(results, aes(x = ESR1, y = .pred_class,col=ER_Status)) +
   geom_jitter(height=0.1) +
   labs(x = "ESR1 Expression", y = "Predicted Probability of ER-Positive") 
 ```
-
+This can also be visualised if we choose to get classification *probabilities* from the model rather than just class predictions. 
 
 ```{r}
 prob_predictions <- predict(glm_fit, new_data = test_data, type = "prob") 
@@ -141,8 +161,8 @@ Metric_Summary
 ## Adding more predictors
 
 ```{r}
-train_data <- select(train_data, ACTR3B:UBE2T,ER_Status)
-test_data <- select(test_data, ACTR3B:UBE2T,ER_Status)
+train_data <- dplyr::select(train_data, ACTR3B:UBE2T,ER_Status)
+test_data <- dplyr::select(test_data, ACTR3B:UBE2T,ER_Status)
 
 # Fit the model
 dt_fit <- fit(dt_spec, ER_Status ~ ., data = train_data)
@@ -174,4 +194,36 @@ Metric_Summary
 library(vip)
 vip(dt_fit)
 ```
+
 ## Trying a random forest
+
+
+```{r}
+# Specify the random forest model
+rf_spec <- rand_forest(
+  trees = 500
+) %>%
+  set_engine("ranger") %>%
+  set_mode("classification")  # Replace "classification" with "regression" for regression tasks
+
+# Fit the model
+rf_fit <- fit(rf_spec, formula = ER_Status ~ ., data = train_data)
+
+# Make predictions
+predictions <- predict(rf_fit, new_data = test_data)
+
+metrics <- augment(rf_fit, new_data = test_data)
+
+# Calculate metrics
+Metric_Summary <- bind_rows(Metric_Summary, data.frame(Accuracy = accuracy(metrics, truth = ER_Status, estimate = .pred_class)$.estimate, 
+                  Precision=precision(metrics, truth = ER_Status, estimate = .pred_class)$.estimate,
+                  Recall = recall(metrics, truth = ER_Status, estimate = .pred_class)$.estimate,
+                  F1 = f_meas(metrics, truth = ER_Status, estimate = .pred_class)$.estimate,
+                  Method = "Random Forest")
+)
+Metric_Summary
+
+```
+
+
+
