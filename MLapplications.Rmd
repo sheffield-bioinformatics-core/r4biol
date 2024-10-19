@@ -9,26 +9,26 @@ Breast cancer is used here an example application of machine learning due to sev
 
 - Large Datasets: There are extensive datasets available for breast cancer research, including gene expression data, clinical information, and patient outcomes. These large datasets provide ample data for training and evaluating machine learning models.
 
-- Complex Relationships: Breast cancer is a complex disease with multiple factors influencing its development and progression. Machine learning algorithms can effectively identify intricate patterns and relationships within the data that might not be apparent to human analysis.
+- Complex Relationships: Breast cancer is a complex disease with multiple factors influencing its development and progression. Machine learning algorithms canidentify  patterns and relationships within the data.
 
-- Personalized Treatment: Machine learning can assist in developing personalized treatment plans by identifying patient subgroups with similar characteristics and predicting their response to different therapies.
+- Personalized Treatment: Machine learning can assist in developing personalized treatment plans by identifying patient subgroups with similar characteristics, and predicting their response to different therapies.
 
 The first example will consider the *ER status* of a tumour. ER Status (Estrogen Receptor Status) is a crucial factor in breast cancer. It refers to the presence or absence of estrogen receptors on breast cancer cells.
 
 - ER-Positive: If breast cancer cells have estrogen receptors, they are considered ER-positive. These cells are sensitive to estrogen, and the hormone can stimulate their growth.
 - ER-Negative: If breast cancer cells do not have estrogen receptors, they are considered ER-negative. These cells are less likely to be influenced by estrogen.
 
-ER status is traditionally measured using immunohistochemistry (IHC). In IHC, a tissue sample from the breast tumor is treated with antibodies that specifically bind to estrogen receptors. If the antibodies bind to the tumor cells, it indicates the presence of estrogen receptors, making the tumor ER-positive.
+ER status is traditionally measured using immunohistochemistry (IHC). In IHC, a tissue sample from the breast tumor is treated with antibodies that specifically bind to estrogen receptors. If the antibodies bind to the tumor cells, it indicates the presence of estrogen receptors, making the tumor ER-positive. Importantly, tumours that are ER-positive *generally* have more treatment options and thus patients that are ER-positive have better chances of long-term survival.
 
 **Can we use Machine learning to classify the ER status of a tumour based on omics data?** For this we will use a version of the TCGA dataset that has been processed to include various RNA-seq measurements from a set of genes, along with clinical characteristics of patients.
 
 
-## Logistic Regression
 
 ```{r}
 data <- readRDS("brca_ML_example.rds")
 data 
 ```
+## Logistic Regression
 
 
 ```{r}
