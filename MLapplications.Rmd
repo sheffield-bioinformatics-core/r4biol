@@ -23,15 +23,11 @@ ER status is traditionally measured using immunohistochemistry (IHC). In IHC, a 
 **Can we use Machine learning to classify the ER status of a tumour based on omics data?** For this we will use a version of the TCGA dataset that has been processed to include various RNA-seq measurements from a set of genes, along with clinical characteristics of patients.
 
 
-<<<<<<< HEAD
 
-=======
->>>>>>> 0f2eee3d1ed66cd075fb8a08b8d65115e157328c
 ```{r}
 data <- readRDS("brca_ML_example.rds")
 data 
 ```
-## Logistic Regression
 
 
 ## Logistic Regression
@@ -56,7 +52,7 @@ train_data <- training(split)
 test_data <- testing(split)
 ```
 
-Define the model and fit
+Define the model and fit. The fit is defined using R's formula syntax with `ER_Status` being the categorical variable that we are trying to predict, and `ESR1` being the numeric variable used to predict. Later on, we will try and fit models with more than one predictor. We need to make sure that the `train_data` is used to fit the model.
 
 ```{r}
 # Specify the model
