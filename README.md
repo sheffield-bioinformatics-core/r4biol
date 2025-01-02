@@ -1,3 +1,6 @@
+
+![](logo-sm.png)
+
 # R for Biological Data Analysis
 
 ## Part 1 (R with a biological twist)
@@ -12,10 +15,20 @@
 + "piping" to create short workflows
   + **TO-DO** make some exercises
 
+### Package install
+
+```
+install.pacakges(c("readr",
+                  "dplyr",
+                  "ggplot2"))
+
+```
+
 ### Materials
 
 + [HTML](Part1.nb.html)
 + [Markdown](Part1.Rmd)
++ [Example Data (tcga_clinical_CLEANED.tsv)](tcga_clinical_CLEANED.tsv)
 
 ## Part 2 (Tidy RNA-seq)
 

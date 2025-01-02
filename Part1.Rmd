@@ -41,7 +41,15 @@ library(readr)
 clinical <- read_tsv("tcga_clinical_CLEANED.tsv")
 ```
 
-If you got an error `could not find function "read_tsv"` at the previous step, it will because you don't have the `readr` package loaded. The RStudio output may indicate some problems with the data, but we should be able to proceed.
+If you got an error `could not find function "read_tsv"` at the previous step, it will because you don't have the `readr` package installed. In which you will need to run the command:-
+
+```{r eval=FALSE}
+install.packages("readr")
+library(readr)
+```
+
+This will install the `readr` package. You will then need to run the `read_tsv` line of code from above.
+
 
 
 <div class="information">
@@ -72,6 +80,14 @@ The tasks required to do this will be greatly helped by the `dplyr` package.
 ```{r}
 library(dplyr)
 ```
+
+As with the `readr` package above, you will need to have installed the `dplyr` package beforehand. 
+
+```{r eval=FALSE}
+install.packages("dplyr")
+
+```
+
 
 ## Choosing what columns to analyse
 
