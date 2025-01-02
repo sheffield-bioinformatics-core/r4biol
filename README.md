@@ -7,21 +7,23 @@
 
 ### Overview
 
-+ Importing data from a spreadsheet
++ Importing example "medical data" from a spreadsheet
 + selecting columns
 + restricting rows with filter
 + summarising data, and grouping
 + boxplots and bar plots
 + "piping" to create short workflows
-  + **TO-DO** make some exercises
 
 ### Package install
 
-```
-install.pacakges(c("readr",
-                  "dplyr",
-                  "ggplot2"))
 
+
+```
+install.packages(c("readr",
+                  "dplyr",
+                  "ggplot2",
+                  "stringr",
+                  "forcats"))
 ```
 
 ### Materials

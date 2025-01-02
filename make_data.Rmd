@@ -3,6 +3,30 @@ title: "TCGA Breast"
 output: html_notebook
 ---
 
+
+## Make the clincal example a bit messier
+
+```{r}
+library(messy)
+set.seed(20250102)
+old <- read_tsv("tcga_clinical_CLEANED.tsv")  %>% 
+  select(tumor_tissue_site,
+                        gender,
+                        age_at_diagnosis,
+                        height_at_diagnosis = height_cm_at_diagnosis) %>% 
+  mutate(age_at_diagnosis = as.character(age_at_diagnosis))
+
+old %>% 
+  add_whitespace(cols = "tumor_tissue_site") %>% 
+  change_case(cols = "gender") %>% 
+  make_missing(cols = "age_at_diagnosis",missing=c("NULL", "N/A")) %>% 
+  filter(!is.na(tumor_tissue_site), !is.na(gender)) %>% 
+  mutate(height_at_diagnosis = ifelse(!is.na(height_at_diagnosis), paste0(height_at_diagnosis, "cm"), height_at_diagnosis)) %>% 
+  write_tsv("tcga_clinical_MESSY.tsv")
+```
+
+
+
 Load the data previously-extracted from TCGA
 
 ```{r eval=FALSE}

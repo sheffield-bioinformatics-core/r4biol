@@ -31,7 +31,14 @@ The readxl package can also import files in Excel's own format
 - `read_xls`
 - `read_xlsx`
 
-We will use the file `tcga_clinical_CLEANED.tsv` as an example. This file contains information about biological samples that were included as part of the TCGA (The Cancer Genome Atlas) project - all tumour types.
+We will use the file `tcga_clinical_CLEANED.tsv` (11MB) as an example. This file contains information about biological samples that were included as part of the TCGA (The Cancer Genome Atlas) project - all tumour types.
+
+If you do not have this file, it can be downloaded with the following code. N.B. the code will first check if the file is present or not.
+
+```{r}
+if(!file.exists("tcga_clinical_CLEANED.tsv")) download.file(url = "https://sbc.shef.ac.uk/r4biol/tcga_clinical_CLEANED.tsv", 
+              destfile = "tcga_clinical_CLEANED.tsv")
+```
 
 
 As the file name ends in `.tsv` the function we want is probably `read_tsv`
@@ -147,6 +154,11 @@ An equivalent, but somewhat unnecessary for this example, statement would be to 
 ```{r}
 filter(analysis_data, gender != "MALE")
 ```
+
+<div class="information">
+Identifying male or females based on the `gender` column is simplified by there only being two possible entries in this column; `MALE` or `FEMALE`. In a real life situation, especially if data have been entered by hand, there could be inconsistencies that require action. See an example at the end of the tutorial. 
+</div>
+
 We can also restrict the data based on numeric columns by using `>`, `<` etc.
 
 ```{r}
@@ -161,7 +173,7 @@ filter(analysis_data, gender == "MALE",tumor_tissue_site == "Brain")
 ```
 
 
-Brain or Lung tumours? Using a `|` symbol instead of a `,` allows for *either* of two (or more) conditions to be `TRUE`. 
+How about brain or lung tumours? Using a `|` symbol instead of a `,` allows for *either* of two (or more) conditions to be `TRUE`. 
 
 
 ```{r}
@@ -177,6 +189,9 @@ filter(analysis_data, gender == "FEMALE",tumor_tissue_site == "Brain")
 ```
 
 and make a note of the number of observations included in the resulting data frame.
+
+## Summarising
+
 Although useful for data exploration, it would clearly be inefficient to get gender/tumour type counts in this way as we would have to repeat for all combinations of tumour type and gender. The function `count` can now give us exactly what we want.
 
 ```{r}
@@ -224,6 +239,7 @@ summarise(data_grouped,Average = mean(age_at_diagnosis),
           max = max(age_at_diagnosis) )
 ```
 
+## Sorting (arranging)
 
 Further investigation of the data could also involve finding the observations with the maximum or minimum diagnosis age.
 
@@ -237,12 +253,15 @@ arrange(analysis_data, tumor_tissue_site, desc(age_at_diagnosis))
 ## could also add another sorting variable of gender if we wanted!
 
 ```
+## Workflows and "piping"
 
 So far we have used several operations in isolation. However, the real joy (?) of `dplyr` is how different operations can be chained together. Lets say we just wanted female tumours.
 
 ```{r}
 filter(analysis_data, gender == "FEMALE")
 ```
+
+
 
 Our next step could be to remove the `gender` column since it is somewhat redundant.
 
@@ -294,6 +313,8 @@ this can be translated into `ggplot2` language as follows -
 ggplot(analysis_data, aes(x = tumor_tissue_site, y = age_at_diagnosis)) + geom_boxplot()
 ```
 
+A disadvantage of the boxplot is that it only gives a very crude summary of the data. 
+
 ```{r}
 ggplot(analysis_data, aes(x = tumor_tissue_site, y = age_at_diagnosis)) + geom_boxplot() + geom_jitter(width=0.1)
 ```
@@ -301,7 +322,7 @@ ggplot(analysis_data, aes(x = tumor_tissue_site, y = age_at_diagnosis)) + geom_b
 
 
 
-A bar plot would be a natural choice for showing the counts of male / female samples. The `geom_bar` plot will automatically count how many 
+A bar plot would be a natural choice for showing the counts of male / female samples. The `geom_bar` plot will automatically count how many occurrences there are for each value.
 
 ```{r}
 ggplot(analysis_data, aes(x = gender)) + geom_bar()
@@ -316,5 +337,181 @@ ggplot(bladder_data, aes(x = gender)) + geom_bar()
 
 ```{r}
 ggplot(analysis_data, aes(x = gender)) + geom_bar() + facet_wrap(~tumor_tissue_site)
+```
+
+## Challenges of "messy" data
+
+Real-life data are often 
+
+- [Data Carpentry Spreadsheets lesson](https://data-lessons.github.io/gapminder-spreadsheet/)
+
+```{r}
+messy <- read_tsv("tcga_clinical_MESSY.tsv")
+messy
+
+```
+
+### Whitespace
+
+"whitespace" is the addition of a blank character or space to the beginning or end of text. Traditionally it is a problem because it will create extra categories in your data. e.g. `MALE` and `MALE `. The messy dataset that you have just imported includes some whitespace in the `tumor_tissue_site` column. However, the `read_tsv` function automatically ignores whitespace values as the `trim_ws` argument of `read_tsv` is set to `TRUE` (see the help page `?read_tsv`). 
+
+```{r}
+messy_ws <- read_tsv("tcga_clinical_MESSY.tsv", 
+                     trim_ws = FALSE)
+messy_ws
+
+count(messy_ws,tumor_tissue_site)
+
+```
+
+The resulting data frame now contains two apparently identical categories for `Bladder`. However, with the use of the `nchar` function, which counts the number of characters, we can see that extra spaces must be included.
+
+```{r}
+count(messy_ws,tumor_tissue_site) %>% 
+  mutate("Length_of_Label" = nchar(tumor_tissue_site))
+```
+
+Clearly we could have used the default settings for `read_tsv` and the problem would not have occurred. Otherwise, it is useful to know about the `stringr` package that contains many useful functions for cleaning character data.
+
+- [The stringr package](https://stringr.tidyverse.org/)
+
+For the example of removing whitespace we can use the `str_trim` function combined with a `mutate`. This will replace all the whitespace in the `tumor_tissue_site` column and overwrite the column. If we repeat a count afterwards we see only the unique entries that we expect.
+
+```{r}
+library(stringr)
+
+mutate(messy_ws, tumor_tissue_site = str_trim(tumor_tissue_site)) %>%
+  count(tumor_tissue_site)
+
+```
+
+## Inconsistent coding of variables
+
+Unfortunately`tumor_tissue_site` column is not the only one with issue that need fixing with these data. If, as before, we try and plot the number of males/females in the dataset we get a surprise.
+
+
+```{r}
+ggplot(messy, aes(x = gender)) + geom_bar()
+```
+
+There is no differentiation between `female` and `FEMALE` or `male` and `MALE`. Whilst we can intuitively decide that these represent the same value, they do not get automatically combined in R. The consequence being that attempts to identify all the male patients will require some careful coding. The example used previously will now no longer identify all the correct patients.
+
+```{r}
+filter(messy, gender == "MALE")
+```
+One solution when filtering would be to add different criteria to account for the different capitalisation
+
+```{r}
+filter(messy, gender == "MALE" | gender == "male")
+```
+However, since we know that the error is due to inconsistent use of upper/lowercase we can use the `str_to_upper` function in `stringr` to convert all values to uppercase. Or indeed we could convert all to lowercase using `str_to_lower` if we prefered.
+
+```{r}
+messy %>% 
+  mutate(gender = str_to_upper(gender)) %>% 
+  ggplot(aes(x = gender)) + geom_bar()
+```
+We would probably want to also make the change permanent by creating a new variable
+
+```{r}
+cleaned <- read_tsv("tcga_clinical_MESSY.tsv") %>% 
+    mutate(gender = str_to_upper(gender)) 
+```
+
+A more generic approach would be to use the `forcats` package to replace all occurrences of `male` with `MALE` and the same for females.
+
+- [The forcats package](https://forcats.tidyverse.org/)
+
+The package allows us to "recode" entries in a column that contains a `factor`. i.e. categorical.
+
+```{r}
+library(forcats)
+mutate(messy, gender = forcats::fct_recode(gender,"MALE"="male"),
+       gender = forcats::fct_recode(gender,"FEMALE"="female")) %>% 
+    ggplot(aes(x = gender)) + geom_bar()
+```
+
+The approach is more flexible than merely changing the case, as it could also replace other values such as "m" or "f" if they existed.
+
+```{r eval=FALSE}
+## Just example code if we wanted to replace "m" with "MALE"
+messy <- messy %>%
+  mutate(gender = fct_recode(gender,
+                            "MALE" = "male", 
+                            "MALE" = "m" 
+  ))
+
+
+```
+
+
+## Different means of representing missing values
+
+There are many different strategies for representing missing data. The `read_tsv` function should automatically detect any `NA` values in the source dataset and treat them appropriately. However, in our messy dataset we also have `NULL` values (as seen by making a count of the values in `age_at_diagnosis`). 
+
+```{r}
+count(messy, age_at_diagnosis) %>% arrange(desc(n))
+```
+
+Because the `NULL` value is present in the `age_at_diagnosis` column, R will treat. the entire column as containing characters. Therefore we cannot use the kind of plots we would expect with numeric data
+
+```{r eval=FALSE}
+ggplot(messy, aes(x = age_at_diagnosis)) + geom_histogram()
+```
+
+```{r}
+  group_by(messy, tumor_tissue_site) %>% 
+  summarise(Mean_Diagnosis_Age = mean(age_at_diagnosis,na.rm=TRUE))
+```
+
+The `read_tsv` function has the ability to replace NA values when the data are imported. Specifically, the `na` argument can be used to define what values are being used to represent missing.
+
+```{r}
+read_tsv("tcga_clinical_MESSY.tsv", na = c("NULL","NA")) %>% 
+  ggplot(aes(x = age_at_diagnosis)) + geom_histogram()
+```
+
+```{r}
+read_tsv("tcga_clinical_MESSY.tsv", na = c("NULL","NA")) %>% 
+  group_by(tumor_tissue_site) %>% 
+  summarise(Mean_Diagnosis_Age = mean(age_at_diagnosis,na.rm=TRUE))
+```
+
+## Including units in the column
+
+The final column in this example contains height information (where available) for our patients. Clearly it is important to know what units this is recorded in, but placing the units inside the entries creates issues as we can't treat the data as numbers.
+
+```{r}
+arrange(messy,height_at_diagnosis)
+```
+The `stringr` package can be used again, and this time a function called `str_remove_all` which removes all occurrences of a particular string. In particular we want to remove `cm`. We will need an additional step to convert the column into numeric values
+
+```{r}
+messy %>% 
+  mutate(height_at_diagnosis=str_remove_all(height_at_diagnosis, "cm")) %>% 
+  mutate(height_at_diagnosis = as.numeric(height_at_diagnosis)) %>% 
+  arrange(height_at_diagnosis)
+```
+
+There is usually more than one way of completing a task in R. In this instance, we could also use the `str_sub` function in `stringr` to extract a "substring" from each entry in the column. The argument `end=-3` specifies that the extraction should end three characters before the end of each string.
+
+```{r}
+messy %>% 
+  mutate(height_at_diagnosis=str_sub(height_at_diagnosis, end=-3)) %>% 
+    mutate(height_at_diagnosis = as.numeric(height_at_diagnosis)) %>% 
+  arrange(height_at_diagnosis)
+
+
+```
+
+### Final code to clean the data
+
+```{r}
+cleaned <- read_tsv("tcga_clinical_MESSY.tsv", na = c("NULL","NA")) %>% 
+  mutate(messy, gender = forcats::fct_recode(gender,"MALE"="male"),
+       gender = forcats::fct_recode(gender,"FEMALE"="female")) %>% 
+    mutate(height_at_diagnosis=str_sub(height_at_diagnosis, end=-3)) %>% 
+    mutate(height_at_diagnosis = as.numeric(height_at_diagnosis))
+
 ```
 
