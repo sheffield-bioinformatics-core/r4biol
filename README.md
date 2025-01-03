@@ -16,8 +16,6 @@
 
 ### Package install
 
-
-
 ```
 install.packages(c("readr",
                   "dplyr",
@@ -42,6 +40,17 @@ install.packages(c("readr",
 + Using PCA as QC diagnostic
 + Differential expression to find statistically-significant genes
 + Associating statistical findings with biological and clinical significance
+
+### Package Install
+
+```
+install.packages("BiocManager")
+BiocManager::install(c("SummarizedExperiment",
+                      "tidybulk",
+                      "org.Hs.eg.db",
+                      "EnhancedVolcano"))
+
+```
 
 ### Materials
 

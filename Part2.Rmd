@@ -9,13 +9,13 @@ output:
     css: stylesheets/styles.css
 ---
 
-We have prepared an RNA-seq dataset uses cases that appeared in The Cancer Genome Atlas (TCGA) breast cancer cohort. It consists of X primary tumours and Y normal tissue samples. The purpose of the tutorial is to
+We have prepared an RNA-seq dataset uses cases that appeared in The Cancer Genome Atlas (TCGA) breast cancer cohort. The purpose of the tutorial is to:-
 
 - show the key stages in performing an RNA-seq analysis from count data
 - doing that analysis in a manner that is consistent with the tidyverse framework
 
 This tutorial uses a framework set out in :-
-https://stemangiola.github.io/rpharma2020_tidytranscriptomics/articles/tidytranscriptomics.html
+[https://stemangiola.github.io/rpharma2020_tidytranscriptomics/articles/tidytranscriptomics.html](https://stemangiola.github.io/rpharma2020_tidytranscriptomics/articles/tidytranscriptomics.html)
 
 The data have to be read into R first. It consists of two files containing the counts and "metadata" about the samples. Both are in tab-delimited files so we can use the `read.table` function from base R. The counts are required to be in a numeric matrix form with rownames being gene or feature identifiers. We have to manipulate the input data accordingly.
 
@@ -42,7 +42,7 @@ rm(raw)
 rm(counts)
 ```
 
-The counts can be accessed using the `assay` function. Each entry is the number of counts assigned to a particular gene (row) in a given sample (column). The row and column names are the Ensembl gene identifier, and sample name from TCGA.
+The *raw* counts can be accessed using the `assay` function. Each entry is the number of counts assigned to a particular gene (row) in a given sample (column). The row and column names are the Ensembl gene identifier, and sample name from TCGA.
 
 ```{r}
 library(dplyr)
@@ -72,7 +72,6 @@ The `tidybulk` package solves this issues, and also provides a way of performing
 ```{r}
 library(tidybulk)
 brca_tidy <- brca %>% tidybulk()
-brca_tidy
 ```
 
 ```{r}
@@ -114,6 +113,7 @@ brca_tidy %>%
   summarise(LibrarySize = sum(counts)) %>% 
   mutate(`Library Size - Millions of Reads` = LibrarySize / 1e6)
 ```
+
 The above were examples of using the standard `tidyverse` operations. The `tidybulk` package also has functions for implementing the steps in a standard RNA-seq workflow.
 
 ## Filtering to expressed features

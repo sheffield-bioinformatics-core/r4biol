@@ -490,8 +490,6 @@ messy <- messy %>%
                             "MALE" = "male", 
                             "MALE" = "m" 
   ))
-
-
 ```
 
 
