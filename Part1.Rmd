@@ -63,7 +63,7 @@ This will install the `readr` package. You will then need to run the `read_tsv` 
 If you get really stuck reading data into R, you can use the Import Dataset option from the File menu which will allow you to choose the parameters to read the data interactively
 </div>
 
-The Environment panel of RStudio (top-right) should show that an object called `clinical` has been created. This means that we can start doing analysis this dataset. The choice to call the object `clinical` was ours. We could have used any name instead of `clinical` but we chose something vaguely informative and memorable.
+The Environment panel of RStudio (top-right) should show that an object called `clinical` has been created. This means that we can start doing some analysis on this dataset. The choice to call the object `clinical` was ours. We could have used any name instead of `clinical` but we chose something vaguely informative and memorable.
 
 The dimensions of the object should should `7706 obs. of 420 variables`. This means the object we have created contains 7706 rows and 420 columns. Each row is a different observation; in this case a different biological sample. Each column records the value of a different variable. In R's terminology, we have just created a `tibble` which is a special case of something called a `data.frame`. As we will see the the object can contain either numbers or text in each column.
 
@@ -98,7 +98,11 @@ install.packages("dplyr")
 
 ## Choosing what columns to analyse
 
-The `select` function allows us to narrow down the number of variables we are interested in from 420. The first argument is always the name of the data frame. There are numerous different ways of specifying which column(s) you want, including listing the names of the columns of interest. Let's assume we already know the names of columns containing tumour type and gender.
+The `select` function allows us to narrow down the number of variables we are interested in from 420. The first argument is always the name of the data frame. There are numerous different ways of specifying which column(s) you want, including typing the names of the columns of interest *in exactly the same way that they appear in the data*. Let's assume we already know the names of columns containing tumour type and gender.
+
+<div class="information">
+The dataset utilizes a binary classification of gender as 'male' or 'female'. It is important to note that this categorization may not fully encompass the diverse range of gender identities recognized today.
+</div>
 
 ```{r}
 ##Note that the spelling of "tumor" has to exactly match that found in the data
@@ -117,15 +121,16 @@ select(clinical, Age)
 Without manually going through the columns, there are a few "helper" functions that we can employ
 
 ```{r}
-select(clinical, starts_with("age"))
 select(clinical, contains("age"))
 select(clinical, contains("age_"))
+select(clinical, starts_with("age"))
 ```
 
-Up to now we have not changed the underlying dataset. `select` is showing what the dataset looks like with the specified subset. If we want to make permanent changes we can create a variable
+Up to now we have not changed the underlying dataset. `select` is showing what the dataset looks like after applying the specified subset. If we want to make permanent changes we can create a variable
 
 ```{r}
 analysis_data <- select(clinical,
+                        bcr_patient_barcode,
                         tumor_tissue_site,
                         gender,
                         age_at_diagnosis)
@@ -137,7 +142,7 @@ The `select` function only performs the very specific task of letting you choose
 
 The function to choose or restrict to the rows we might be interested in is called `filter`. We have to write a short R command to choose the rows. 
 
-e.g. we want only the male samples. Notice that two "=" signs are required. If you try and use the function with a single "=" R will print a helpful hint. 
+e.g. if we want only the male samples we use the following code. Notice that two "=" signs are required. If you try and use the function with a single "=" R will print a helpful hint. 
 
 ```{r}
 filter(analysis_data, gender == "MALE")
@@ -185,14 +190,13 @@ To answer the question of how many males / females have a certain tumour type we
 ```{r}
 filter(analysis_data, gender == "MALE",tumor_tissue_site == "Brain")
 filter(analysis_data, gender == "FEMALE",tumor_tissue_site == "Brain")
-
 ```
 
-and make a note of the number of observations included in the resulting data frame.
+and make a note of the number of observations included in the resulting data frame. However, there is much more flexible way of summarising data in this manner.
 
 ## Summarising
 
-Although useful for data exploration, it would clearly be inefficient to get gender/tumour type counts in this way as we would have to repeat for all combinations of tumour type and gender. The function `count` can now give us exactly what we want.
+Although useful for data exploration, it would clearly be inefficient to get gender/tumour type counts in this way as we would have to repeat for all combinations of tumour type and gender. The function `count` can now give us exactly what we want. The output is given as a `tibble`, so we could use some of the functions that we have learnt about so far (`select`, `filter`...) to further manipulate. e.g. obtain the counts for just Brain/
 
 ```{r}
 count(analysis_data, 
@@ -200,7 +204,7 @@ count(analysis_data,
       gender)
 ```
 
-The `count` function is useful for tabulating the number of observations, but for other summary statistics a more general `sumamrise` function can be used. This can be used in conjunction with the basic summary statistics supported by base R. A summary statistic being something that can be applied to a series of numbers and produce a single number as a result. e.g. the average, minimum, maximum etc.
+The `count` function is useful for tabulating the number of observations, but for other summary statistics a more general `sumamrise` function can be used. This can be used in conjunction with basic summary functions supported by base R. A summary statistic being something that can be applied to a series of numbers and produce a single number as a result. e.g. the average, minimum, maximum etc.
 
 ```{r}
 summarise(analysis_data, 
@@ -208,7 +212,7 @@ summarise(analysis_data,
           min = min(age_at_diagnosis),
           max = max(age_at_diagnosis))
 ```
-However, we obviously have a problem due to missing values. If R sees and missing values in a column it will report the mean, minimum or maximum of that column as a missing value. Although this default behaviour can be changes, before proceeding we could also choose to remove any missing observations from the data. These are represented by a `NA` value, which is a special value and not a character label.  
+However, we have a problem due to missing values. If R sees and missing values in a column it will report the mean, minimum or maximum of that column as a missing value. Although this default behaviour can be changed, before proceeding we could also choose to remove any missing observations from the data. These are represented by a `NA` value, which is a special value and not a character label.  
 
 ```{r}
 filter(analysis_data, is.na(age_at_diagnosis) | is.na(tumor_tissue_site))
@@ -229,7 +233,7 @@ summarise(analysis_data,
           max = max(age_at_diagnosis))
 ```
 
-This might not be what we want in all circumstances, as the statistics can also be calculated on a per-tumour site basis. 
+This might not be what we want in all circumstances, as the statistics can also be calculated on a per-tumour site basis using `dplyr`s `group_by` function. 
 
 ```{r}
 
@@ -241,18 +245,25 @@ summarise(data_grouped,Average = mean(age_at_diagnosis),
 
 ## Sorting (arranging)
 
-Further investigation of the data could also involve finding the observations with the maximum or minimum diagnosis age.
+We have previously used `filter` to restrict the rows that we are interested in. Rather than just analysing the male or female patients (for example), we might also want the rows in our table to be ordered according to the `gender` column. 
 
 ```{r}
-## desc specifies descending order
+arrange(analysis_data, gender)
+```
+We can also arrange by columns containing numeric values in either ascending (the default) or descending order.
+
+```{r}
+arrange(analysis_data, age_at_diagnosis)
+## Use a descending order
 arrange(analysis_data, desc(age_at_diagnosis))
 ```
+Like how sorting works in Excel, we can also use mutliple columns for sorting. e.g. if we want ordering by diagnosis age for each tumour type separately.
+
 ```{r}
-arrange(analysis_data, tumor_tissue_site, desc(age_at_diagnosis))
-
-## could also add another sorting variable of gender if we wanted!
-
+arrange(analysis_data, tumor_tissue_site, age_at_diagnosis)
 ```
+
+
 ## Workflows and "piping"
 
 So far we have used several operations in isolation. However, the real joy (?) of `dplyr` is how different operations can be chained together. Lets say we just wanted female tumours.
@@ -272,11 +283,30 @@ select(analysis_data2, tumor_tissue_site, age_at_diagnosis)
 ## select(analysis_data2, -gender)
 ```
 
-The code would quickly get cumbersome if we wanted to include additional steps such as removing `NA` values. An alternative approach called "piping" is recommended.
+The code would quickly get cumbersome if we wanted to include additional steps such as removing `NA` values. An alternative approach called "piping" is recommended and activated by adding `%>%` at the end of a line. This tells R to use the output of the current line as the first argument on the next line. In this current example it means we don't need to specify which data frame that `select` uses as input - it will use the data frame created by the `filter` in the previous line. The code written using `%>%` is more concise.
+
 
 ```{r}
 filter(analysis_data, gender == "FEMALE") %>% ## and then...
   select(tumor_tissue_site, age_at_diagnosis) ## %>% and then...
+```
+
+<div class="information">
+The `%>%` operation becomes available when you load `dplyr`. If you wish to use piping outside of `dplyr` there is also a "base" equivalent `|>` that doesn't require any libraries to be loaded
+```{r}
+filter(analysis_data, gender == "FEMALE") |> ## and then...
+  select(tumor_tissue_site, age_at_diagnosis) ## |> and then...
+```
+</div>
+
+We recently created a summary table for each tumour type giving the average, minimum and maximum of diagnosis age. This can be replicated using `%>%` and an extra sorting step added to the end.
+
+```{r}
+group_by(analysis_data, tumor_tissue_site) %>% 
+summarise(Average = mean(age_at_diagnosis),
+          min = min(age_at_diagnosis),
+          max = max(age_at_diagnosis)) %>% 
+  arrange(Average)
 ```
 
 
