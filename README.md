@@ -48,7 +48,8 @@ install.packages("BiocManager")
 BiocManager::install(c("SummarizedExperiment",
                       "tidybulk",
                       "org.Hs.eg.db",
-                      "EnhancedVolcano"))
+                      "EnhancedVolcano",
+                      "ggrepel"))
 
 ```
 

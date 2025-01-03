@@ -84,7 +84,7 @@ We just want to see the counts for a particular biological sample
 ```{r}
 brca_tidy %>% 
   filter(patient == "TCGA-BH-A0EE") %>% 
-  dplyr::select(.feature,counts)
+  dplyr::select(.feature,counts) %>% slice(1:10)
 ```
 
 We want the counts for a particular gene, and which sample it is most highly-expressed in 
@@ -123,7 +123,7 @@ The above were examples of using the standard `tidyverse` operations. The `tidyb
 
 ```{r}
 counts_filtered <- brca_tidy %>% keep_abundant(factor_of_interest=er_status_by_ihc)
-counts_filtered
+counts_filtered %>% slice(1:10)
 ```
 
 ## Scaling counts to normalise
@@ -133,6 +133,7 @@ counts_filtered
 ```{r}
 counts_scaled <- counts_filtered %>% scale_abundance()
 ```
+
 ## Dimensionality reduction
 
 > By far, one of the most important plots we make when we analyse RNA sequencing data are principal-component analysis (PCA) or multi-dimensional scaling (MDS) plots. We reduce the dimensions of the data to identify the greatest sources of variation in the data. A principal components analysis is an example of an unsupervised analysis, where we don’t need to specify the groups. If your experiment is well controlled and has worked well, what we hope to see is that the greatest sources of variation in the data are the treatments/groups we are interested in. It is also an incredibly useful tool for quality control and checking for outliers. We can use the reduce_dimensions function to calculate the dimensions.
@@ -144,7 +145,8 @@ counts_scal_PCA <-
 ```
 
 ```{r}
-counts_scal_PCA %>% pivot_sample()
+counts_scal_PCA %>% pivot_sample() %>% 
+  dplyr::select(.sample,patient,shortLetterCode,contains("PC"))
 ```
 A basic PCA visualisation will show the values of PC1 and PC2 using a scatter plot.
 
@@ -156,6 +158,7 @@ counts_scal_PCA %>%
     ggplot(aes(x=PC1, y=PC2)) +
     geom_point() 
 ```
+
 This clearly shows a separation samples. Our hope is that the separation can be explained by the biological variation rather than technical (e.g batch effects). Having our data in a tidy form allows us to customise.
 
 Although not very helpful in this case, it is often useful to add labels corresponding to sample names
@@ -176,7 +179,7 @@ counts_scal_PCA %>%
     ggplot(aes(x=PC1, y=PC2, col = shortLetterCode)) +
     geom_point()
 ```
-The separation on the x-axis, corresponding to the first principal component, is due to the samples being either tumour or normal. This makes perfect sense
+The separation on the x-axis, corresponding to the first principal component, is due to the samples being either tumour or normal. This makes perfect sense.
 
 ## Exercise
 
@@ -263,7 +266,7 @@ results_table <- counts_de %>%
   left_join(anno, by=c(".feature"="ENSEMBL")) %>% 
   dplyr::select(-shortLetterCode,-.abundant) %>%
   arrange(padj)
-results_table
+results_table %>% head
 
 rm(counts_de)
 ```
@@ -294,7 +297,6 @@ plot_data <- counts_filtered %>%
   scale_abundance() %>% 
   filter(.feature %in% top_genes) %>% 
   left_join(anno, by = c(".feature" = "ENSEMBL"))
-plot_data
 ```
 A series of boxplots can now be created, with a facet introduced so that a separate plot is made for each gene.
 
