@@ -31,6 +31,7 @@ install.packages(c("readr",
 + [HTML](Part1.nb.html)
 + [Markdown](Part1.Rmd)
 + [Example Data (tcga_clinical_CLEANED.tsv)](tcga_clinical_CLEANED.tsv)
++ [Example Data 2 (tcga_clinical_MESSY.tsv)](tcga_clinical_MESSY.tsv)
 
 ## Part 2 (Tidy RNA-seq)
 

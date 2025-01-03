@@ -312,7 +312,7 @@ summarise(Average = mean(age_at_diagnosis),
 
 ## Overview of plotting
 
-Our recommending way of creating plots in RStudio is to use the `ggplot2` package
+Our recommending way of creating plots in RStudio is to use the `ggplot2` package - especially as it interacts well with `dplyr` and other `tidyverse` packages.
 
 ```{r}
 library(ggplot2)
@@ -331,8 +331,20 @@ The general principle of creating a plot is the same regardless of what kind of 
 - define the type of plot we want
 - apply any additional format changes
 
+A bar plot would be a natural choice for showing the counts of male / female samples. The `geom_bar` plot will automatically count how many occurrences there are for each value.
 
-In order to compare the age distributions of different tumour types we can imagine this being displayed as a boxplot with
+```{r}
+ggplot(analysis_data, aes(x = gender)) + geom_bar()
+```
+
+Numerical data can be visualised using a density plot or histogram. The density is automatically calculated and displayed on the y-axis.
+
+```{r}
+ggplot(analysis_data, aes(x = age_at_diagnosis)) + geom_density()
+```
+
+
+In order to compare the age distributions of different tumour types we can also imagine this being displayed as a series of boxplots with
 
 - the age variable on the y-axis
 - the type of tumour on the x-axis
@@ -343,45 +355,58 @@ this can be translated into `ggplot2` language as follows -
 ggplot(analysis_data, aes(x = tumor_tissue_site, y = age_at_diagnosis)) + geom_boxplot()
 ```
 
-A disadvantage of the boxplot is that it only gives a very crude summary of the data. 
+A disadvantage of the boxplot is that it only gives a very crude summary of the data. It can be misleading when applied to data with few observations and is often preferable to add individual data points
 
 ```{r}
 ggplot(analysis_data, aes(x = tumor_tissue_site, y = age_at_diagnosis)) + geom_boxplot() + geom_jitter(width=0.1)
 ```
-
-
-
-
-A bar plot would be a natural choice for showing the counts of male / female samples. The `geom_bar` plot will automatically count how many occurrences there are for each value.
+Adding some colour to the plot can be achieved by adding a `fill` aesthetic and specifying what column to map the colours too. A colour palette is automatically chosen, but can be changed afterwards if we wish.
 
 ```{r}
-ggplot(analysis_data, aes(x = gender)) + geom_bar()
+ggplot(analysis_data, aes(x = tumor_tissue_site, y = age_at_diagnosis, fill = tumor_tissue_site)) + geom_boxplot() + geom_jitter(width=0.1)
 ```
-
+Adding the `fill` aesthetic for the density plot can be used to show a separate curve for each tumour type. 
 
 ```{r}
-bladder_data <- filter(analysis_data, tumor_tissue_site == "Bladder")
-ggplot(bladder_data, aes(x = gender)) + geom_bar()
+## alpha of 0.5 used to make the curves transparent
+ggplot(analysis_data, aes(x = age_at_diagnosis, fill = tumor_tissue_site)) + geom_density(alpha=0.5)
 ```
-
+Another useful technique for splitting the plots based on a variable is to use the `facet_wrap` function that will give a grid of plots. For instance we can show male/female counts for each tumour type separately.
 
 ```{r}
-ggplot(analysis_data, aes(x = gender)) + geom_bar() + facet_wrap(~tumor_tissue_site)
+ggplot(analysis_data, aes(x = gender,fill=gender)) + geom_bar() + facet_wrap(~tumor_tissue_site)
 ```
 
-## Challenges of "messy" data
+By combining all the techniques we have seen we can compare the diagnosis age between males and females; separately for each tumour type.
 
-Real-life data are often 
+```{r}
+ggplot(analysis_data, aes(x =gender, y = age_at_diagnosis, fill = gender)) + geom_boxplot() + geom_jitter(width=0.1) + facet_wrap(~tumor_tissue_site)
+```
+
+# Challenges of "messy" data
+
+Real-life data are often less straightforward to deal with than the "cleaned" dataset presented here. Despite the many high-throughput technologies that are used for scientific investigation, there is inevitably a spreadsheet(s) needed to describe the experimental setup and this is typically entered manually.
+
+So-called "Data Wrangling" is a crucial and time-consuming part of the analysis process taking 80% of analysis time by some estimates. Hadley Wickham, Chief Scientist at Posit and lead author of `ggplot2` likens tidy and messy data to Leo Tolstoy's quote about families:-
+
+> Happy families are all alike; every unhappy family is unhappy in its own
+way
+
+
+> Like families, tidy datasets are all alike but every messy dataset is messy in its own way. 
+
+A comprehensive guide to the issues surrounding data entry via spreadsheets, and how to avoid them, is given by Data Carpentry.
 
 - [Data Carpentry Spreadsheets lesson](https://data-lessons.github.io/gapminder-spreadsheet/)
+
+However, for public data that we have no control over we often have no choice but to clean the data ourselves. We have intentionally created an alternative dataset with a few intentional issues to illustrate the cleaning process.
 
 ```{r}
 messy <- read_tsv("tcga_clinical_MESSY.tsv")
 messy
-
 ```
 
-### Whitespace
+## Whitespace
 
 "whitespace" is the addition of a blank character or space to the beginning or end of text. Traditionally it is a problem because it will create extra categories in your data. e.g. `MALE` and `MALE `. The messy dataset that you have just imported includes some whitespace in the `tumor_tissue_site` column. However, the `read_tsv` function automatically ignores whitespace values as the `trim_ws` argument of `read_tsv` is set to `TRUE` (see the help page `?read_tsv`). 
 
@@ -389,9 +414,7 @@ messy
 messy_ws <- read_tsv("tcga_clinical_MESSY.tsv", 
                      trim_ws = FALSE)
 messy_ws
-
 count(messy_ws,tumor_tissue_site)
-
 ```
 
 The resulting data frame now contains two apparently identical categories for `Bladder`. However, with the use of the `nchar` function, which counts the number of characters, we can see that extra spaces must be included.
@@ -409,16 +432,13 @@ For the example of removing whitespace we can use the `str_trim` function combin
 
 ```{r}
 library(stringr)
-
 mutate(messy_ws, tumor_tissue_site = str_trim(tumor_tissue_site)) %>%
   count(tumor_tissue_site)
-
 ```
 
 ## Inconsistent coding of variables
 
-Unfortunately`tumor_tissue_site` column is not the only one with issue that need fixing with these data. If, as before, we try and plot the number of males/females in the dataset we get a surprise.
-
+Unfortunately the `tumor_tissue_site` column is not the only one with issue that need fixing with these data. If, as before, we try and plot the number of males/females in the dataset we get a surprise.
 
 ```{r}
 ggplot(messy, aes(x = gender)) + geom_bar()
@@ -489,6 +509,8 @@ Because the `NULL` value is present in the `age_at_diagnosis` column, R will tre
 ggplot(messy, aes(x = age_at_diagnosis)) + geom_histogram()
 ```
 
+Likewise we can't calculate numeric summaries; although R will attempt to and create a data frame of `NA` values rather than giving an error.
+
 ```{r}
   group_by(messy, tumor_tissue_site) %>% 
   summarise(Mean_Diagnosis_Age = mean(age_at_diagnosis,na.rm=TRUE))
@@ -530,11 +552,11 @@ messy %>%
   mutate(height_at_diagnosis=str_sub(height_at_diagnosis, end=-3)) %>% 
     mutate(height_at_diagnosis = as.numeric(height_at_diagnosis)) %>% 
   arrange(height_at_diagnosis)
-
-
 ```
 
-### Final code to clean the data
+## Final code to clean the data
+
+For reference, here is the final code chunk that can be used to clean the data.
 
 ```{r}
 cleaned <- read_tsv("tcga_clinical_MESSY.tsv", na = c("NULL","NA")) %>% 
@@ -542,6 +564,5 @@ cleaned <- read_tsv("tcga_clinical_MESSY.tsv", na = c("NULL","NA")) %>%
        gender = forcats::fct_recode(gender,"FEMALE"="female")) %>% 
     mutate(height_at_diagnosis=str_sub(height_at_diagnosis, end=-3)) %>% 
     mutate(height_at_diagnosis = as.numeric(height_at_diagnosis))
-
 ```
 
