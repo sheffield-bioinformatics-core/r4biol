@@ -5,6 +5,7 @@ date: '`r format(Sys.time(), "Last modified: %d %b %Y")`'
 output:
   html_document:
     toc: true
+    toc_float: yes
     df_print: paged
     css: stylesheets/styles.css
 ---
@@ -13,15 +14,16 @@ output:
 knitr::opts_chunk$set(echo = TRUE,message=FALSE,warning = FALSE, results = "hide")
 ```
 
-We have prepared an RNA-seq dataset uses cases that appeared in The Cancer Genome Atlas (TCGA) breast cancer cohort. The purpose of the tutorial is to:-
+We have prepared an RNA-seq dataset that uses patients from The Cancer Genome Atlas (TCGA) breast cancer cohort. The purpose of the tutorial is to:-
 
 - show the key stages in performing an RNA-seq analysis from count data
 - doing that analysis in a manner that is consistent with the tidyverse framework
+- Using RNA-seq to identify biologically-relevant changes in transcription 
 
 This tutorial uses a framework set out in :-
-[https://stemangiola.github.io/rpharma2020_tidytranscriptomics/articles/tidytranscriptomics.html](https://stemangiola.github.io/rpharma2020_tidytranscriptomics/articles/tidytranscriptomics.html)
+[https://stemangiola.github.io/rpharma2020_tidytranscriptomics/articles/tidytranscriptomics.html](https://stemangiola.github.io/rpharma2020_tidytranscriptomics/articles/tidytranscriptomics.html) as an application of the `tidybulk` package.
 
-The data have to be read into R first. It consists of two files containing the counts and "metadata" about the samples. Both are in tab-delimited files so we can use the `read.table` function from base R. The counts are required to be in a numeric matrix form with rownames being gene or feature identifiers. We have to manipulate the input data accordingly.
+The data have to be read into R first. It consists of two files containing the counts and "metadata" about the samples. Both are in tab-delimited files so we can use the `read.table` function from base R. However, since the counts are required to be in a numeric matrix form with `rownames` being gene or feature identifiers we have to manipulate the input data accordingly. Specifically, we need to set the rownames to be the gene names and remove the first column from the input data.
 
 ```{r}
 meta <- read.table("brca_example_meta.tsv")
@@ -30,12 +32,12 @@ counts <- raw[,-1]
 rownames(counts) <- raw$ENSEMBL
 ```
 
-The `SummarizedExperiment` is traditionally the way in which RNA-seq data are stored in R.
+The `SummarizedExperiment` is traditionally the way in which RNA-seq data are stored in R and we will use the temporarily before converting to a format compatible with a "tidyverse" way of thinking. We will briefly examine this format.
 
 ```{r message=FALSE}
 library(SummarizedExperiment)
 brca <- SummarizedExperiment(assays=list(counts=counts),
-                     colData=meta)
+                     colData=meta,)
 brca
 ```
 
@@ -49,6 +51,8 @@ rm(counts)
 The *raw* counts can be accessed using the `assay` function. Each entry is the number of counts assigned to a particular gene (row) in a given sample (column). The row and column names are the Ensembl gene identifier, and sample name from TCGA.
 
 ```{r}
+## Use select and slice to print fewer items to the screen
+## Feel free to remove these lines if you want to see the full output
 library(dplyr)
 assay(brca) %>% 
   select(1:4) %>% 
@@ -81,12 +85,20 @@ library(tidybulk)
 brca_tidy <- brca %>% tidybulk()
 ```
 
+```{r eval=FALSE}
+## Not evaluated to print excessive printing to screen for the HTML notes.
+brca_tidy
+```
+
+
+We can now remove the `brca` object to save memory
+
 ```{r}
 rm(brca)
 ```
 
 
-We want the counts for a particular gene, and which sample it is most highly-expressed in 
+Say for example we want the counts for a particular gene, and which sample it is most highly-expressed in 
 
 ```{r}
 brca_tidy %>% 
@@ -105,7 +117,7 @@ brca_tidy %>%
     summarise(mean(counts))
 ```
 
-Counting the total number of reads in each sample as a QC metric
+A basic QC metric is to count the total number of reads for each sample. In a typical bulk RNA-seq study we should be getting 10s of millions of reads - although the total number will vary. Any samples with dramatically lower numbers could be cause for concern.
 
 ```{r results = "asis"}
 brca_tidy %>% 
@@ -113,22 +125,42 @@ brca_tidy %>%
   summarise(LibrarySize = sum(counts)) %>% 
   mutate(`Library Size - Millions of Reads` = LibrarySize / 1e6)
 ```
+The resulting data can be visualised using a `geom_col` in `ggplot2` for example.
+
+```{r results = "asis"}
+library(ggplot2)
+brca_tidy %>% 
+  group_by(.sample) %>% 
+  summarise(LibrarySize = sum(counts)) %>% 
+  mutate(`Library Size - Millions of Reads` = LibrarySize / 1e6) %>% 
+  ggplot(aes(x=.sample, y = `Library Size - Millions of Reads`)) + geom_col()
+```
+
 
 The above were examples of using the standard `tidyverse` operations. The `tidybulk` package also has functions for implementing the steps in a standard RNA-seq workflow.
 
 ## Filtering to expressed features
- 
 
-> Genes with very low counts across all libraries provide little evidence for differential expression and they can interfere with some of the statistical approximations that are used later in the pipeline. They also add to the multiple testing burden when estimating false discovery rates, reducing power to detect differentially expressed genes. These genes should be filtered out prior to further analysis. We can perform the filtering using tidybulk keep_abundant or identify_abundant. These functions can use the edgeR filterByExpr function described in (Law et al. 2016) to automatically identify the genes with adequate abundance for differential expression testing. By default, this will keep genes with ~10 counts in a minimum number of samples, the number of the samples in the smallest group. 
+Genes with extremely low read counts across all samples offer limited evidence of differential expression. These genes can introduce noise into the analysis, potentially affecting the accuracy of statistical methods used downstream. Furthermore, they increase the number of statistical tests performed, leading to a higher risk of false discoveries and reduced power to detect truly differentially expressed genes.
+
+
+To mitigate these issues, we should filter out genes with insufficient read counts before proceeding with further analysis. This can be achieved using the `keep_abundant` or `identify_abundant` functions within the `tidybulk` package. These functions leverage the `filterByExpr` function from the `edgeR` package (Law et al., 2016), which effectively identifies genes with adequate read counts for reliable differential expression analysis. By default, this filter retains genes with at least 10 counts in a minimum number of samples, typically set to the size of the smallest group in the experimental design.
+
 
 ```{r}
 counts_filtered <- brca_tidy %>% keep_abundant(factor_of_interest=er_status_by_ihc)
-counts_filtered %>% slice(1:10) %>% dplyr::select(1:4)
 ```
 
 ## Scaling counts to normalise
 
-> Scaling of counts, normalisation, is performed to eliminate uninteresting differences between samples due to sequencing depth or composition. A more detailed explanation can be found here. In the tidybulk package the function scale_abundance generates scaled counts, with scaling factors calculated on abundant (filtered) transcripts and applied to all transcripts. We can choose from different normalisation methods. Here we will use the default, edgeR’s trimmed mean of M values (TMM), (Robinson and Oshlack 2010). TMM normalisation (and most scaling normalisation methods) scale relative to one sample.
+To account for variations in sequencing depth and library composition across samples, we perform count scaling, often referred to as normalization. This process aims to remove systematic biases that do not reflect true biological differences. 
+
+Within the `tidybulk` package, the `scale_abundance` function generates scaled counts. Scaling factors are calculated based on abundant (filtered) transcripts and then applied to all transcripts.
+
+We can select from various normalization methods. In this analysis, we will utilize the default method: trimmed mean of M values (TMM) as implemented in the `edgeR` package (Robinson and Oshlack, 2010).
+
+It's important to note that TMM normalization, like most scaling methods, scales the counts relative to a single reference sample
+
 
 ```{r}
 counts_scaled <- counts_filtered %>% scale_abundance()
@@ -136,7 +168,13 @@ counts_scaled <- counts_filtered %>% scale_abundance()
 
 ## Dimensionality reduction
 
-> By far, one of the most important plots we make when we analyse RNA sequencing data are principal-component analysis (PCA) or multi-dimensional scaling (MDS) plots. We reduce the dimensions of the data to identify the greatest sources of variation in the data. A principal components analysis is an example of an unsupervised analysis, where we don’t need to specify the groups. If your experiment is well controlled and has worked well, what we hope to see is that the greatest sources of variation in the data are the treatments/groups we are interested in. It is also an incredibly useful tool for quality control and checking for outliers. We can use the reduce_dimensions function to calculate the dimensions.
+Principal Component Analysis (**PCA**) and Multi-Dimensional Scaling (**MDS**) plots are among the most crucial visualizations for analyzing RNA-sequencing data. These techniques reduce the dimensionality of the data, allowing us to identify the primary sources of variation.
+
+PCA, an unsupervised learning method, explores the data without pre-defined groups. In a well-executed experiment, we expect the primary sources of variation to align with the experimental treatments or groups of interest.
+
+Furthermore, PCA is invaluable for quality control and outlier detection.
+
+We can utilize the reduce_dimensions function within the `tidybulk` package to perform these dimensionality reduction analyses. The function reports the proportion of variance explained by the first two components, which by defintion should be higher for PC1.
 
 ```{r}
 counts_scal_PCA <-
@@ -144,22 +182,23 @@ counts_scal_PCA <-
   reduce_dimensions(method="PCA")
 ```
 
+If you print the `counts_scal_PCA` object to screen you will notice that it is still in "long"/"tidy" format, which on this ocassion is not particularly useful for visualisation as many of the variables we need for plotting are repeated many times. To provide a simple summary of PC values for each sample we can use the `pivot_sample` function
+
 ```{r results = "asis"}
 counts_scal_PCA %>% pivot_sample() %>% 
   dplyr::select(.sample,patient,shortLetterCode,contains("PC"))
 ```
-A basic PCA visualisation will show the values of PC1 and PC2 using a scatter plot.
+
+A basic PCA visualisation will show the values of PC1 and PC2 using a scatter plot with `ggplot2`.
 
 ```{r results = "asis"}
-library(ggplot2)
-
 counts_scal_PCA %>%
     pivot_sample() %>%
     ggplot(aes(x=PC1, y=PC2)) +
     geom_point() 
 ```
 
-This clearly shows a separation samples. Our hope is that the separation can be explained by the biological variation rather than technical (e.g batch effects). Having our data in a tidy form allows us to customise.
+This clearly shows a separation samples. Our hope is that the separation can be explained by the biological variation rather than technical (e.g batch effects). Having our data in a tidy form allows us to customise the plot.
 
 Although not very helpful in this case, it is often useful to add labels corresponding to sample names
 
@@ -171,7 +210,7 @@ counts_scal_PCA %>%
     geom_point()  + geom_text_repel()
 ```
 
-Colouring the points according to variables in the data is often informative. In our case we have several clinial characteristics listed that we could try. The `shortLetterCode` corresponds to whether a particular sample is a primary tumour (TP) or normal tissue (NT) is a perfect candidate to try.
+Colouring the points according to variables in the data is often informative. In our case we have several clinial characteristics listed that we could try. The `shortLetterCode` corresponds to whether a particular sample is a primary tumour (TP) or normal tissue (NT) and is a perfect candidate to try.
 
 ```{r results = "asis"}
 counts_scal_PCA %>%
@@ -190,7 +229,7 @@ The separation on the x-axis, corresponding to the first principal component, is
 ```{r echo=FALSE}
 brca_t <- filter(brca_tidy, shortLetterCode == "TP")
 
-counts_filtered <- brca_t %>% keep_abundant(factor_of_interest=BRCA_Subtype_PAM50)
+counts_filtered <- brca_t %>% keep_abundant(factor_of_interest=er_status_by_ihc)
 
 counts_scaled <- counts_filtered %>% scale_abundance()
 
@@ -210,6 +249,9 @@ counts_scal_PCA %>%
 We will now concentrate on the analysis of the tumour samples only, but save the whole object for later sections. To reduce the amount of memory usage we will also remove the scaled counts. 
 
 ```{r}
+brca_t <- filter(brca_tidy, shortLetterCode == "TP")
+counts_filtered <- brca_t %>% keep_abundant(factor_of_interest=er_status_by_ihc)
+
 saveRDS(brca_tidy, "data/brca_tidy.RDS")
 rm(brca_tidy)
 rm(counts_scal_PCA)
@@ -258,7 +300,7 @@ counts_de <- counts_filtered %>%
     )
 ```
 
-The results are still in a *long* format table. This is actually not very helpful, and would prefer to have a single row for each gene tested. The function `pivot_transcript` performs the reshaping. We can now add the gene annotation we created earlier, but retain the original Ensembl IDs so we can retrieve count information. The final `arrange` line orders by significance.
+The results are still in a *long* format table. Again, this is actually not very helpful and would prefer to have a single row for each gene tested. The function `pivot_transcript` performs the reshaping. We can now add the gene annotation we created earlier, but retain the original Ensembl IDs so we can retrieve count information. The final `arrange` line orders by significance.
 
 ```{r results = "asis"}
 results_table <- counts_de %>% 
@@ -267,13 +309,19 @@ results_table <- counts_de %>%
   dplyr::select(-shortLetterCode,-.abundant) %>%
   arrange(padj)
 results_table %>% head
+```
 
+We can write the results to a spreadsheet for further investigation.
+
+```{r}
+write.csv(results_table, "DESeq2_ERpos_vs_EGneg.csv",quote=FALSE,row.names = FALSE)
 rm(counts_de)
 ```
 
+
 A volcano plot is a common visualisation that shows the degree of significance and magnitude of change. Genes of biological significance are likely to be those with  low p-value and more extreme fold-change.
 
-It would be perfectly possible to make the plot using standard `ggplot2` code. However, the `EnhancedVolcano` package simplifies the process and offers some additional features such as automatically labelling the significant genes.
+It would be perfectly possible to make the plot using standard `ggplot2` code. However, the `EnhancedVolcano` package simplifies the process and offers some additional features such as automatically labeling the significant genes.
 
 ```{r results = "asis"}
 library(EnhancedVolcano)
@@ -290,19 +338,23 @@ N <- 10
 top_genes <- slice_head(results_table, n=N) %>% pull(.feature)
 top_genes
 ```
+
 We have to repeat the scaling as we removed the object. The annotation information is include to allow more meaningful labels.
 
 ```{r}
 plot_data <- counts_filtered %>% 
   scale_abundance() %>% 
   filter(.feature %in% top_genes) %>% 
+  filter(er_status_by_ihc %in% c("Positive", "Negative")) %>% 
   left_join(anno, by = c(".feature" = "ENSEMBL"))
 ```
 
-A series of boxplots can now be created, with a facet introduced so that a separate plot is made for each gene.
+A series of boxplots can now be created, with a facet introduced so that a separate plot is made for each gene. Seeing the gene `ESR1` is particularly encouraging as it is expected to be higher in Estrogen Receptor positive patients.
 
 ```{r}
 plot_data %>% 
   ggplot(aes(x = er_status_by_ihc, y = counts_scaled,fill=er_status_by_ihc)) + geom_boxplot() + scale_y_log10() + facet_wrap(~SYMBOL)
 ```
+
+## Extensions
 
