@@ -2,12 +2,16 @@
 title: "R Introduction for RNA-seq"
 author: "Mark Dunning"
 date: '`r format(Sys.time(), "Last modified: %d %b %Y")`'
-output: 
-  html_notebook: 
-    toc: yes
-    toc_float: yes
+output:
+  html_document:
+    toc: true
+    df_print: paged
     css: stylesheets/styles.css
 ---
+
+```{r setup, include=FALSE,message=FALSE,warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message=FALSE,warning = FALSE, results = "hide")
+```
 
 We have prepared an RNA-seq dataset uses cases that appeared in The Cancer Genome Atlas (TCGA) breast cancer cohort. The purpose of the tutorial is to:-
 
@@ -46,7 +50,9 @@ The *raw* counts can be accessed using the `assay` function. Each entry is the n
 
 ```{r}
 library(dplyr)
-assay(brca) %>% head
+assay(brca) %>% 
+  select(1:4) %>% 
+  slice(1:10)
 ```
 
 If we want to know more information about the biological samples we have to use the `colData` function
@@ -54,7 +60,8 @@ If we want to know more information about the biological samples we have to use 
 ```{r}
 colData(brca) %>% 
   data.frame %>% 
-  dplyr::select(1:4)
+  dplyr::select(1:4) %>% 
+  slice(1:10)
 ```
 The format is not immediately accessible to those familiar with a "`tidyverse`" mindset. Mainly because the data are "wide" and not "long". Consider the code to visualise the distribution of each sample as a boxplot (which is a common QC task)
 
@@ -79,26 +86,19 @@ rm(brca)
 ```
 
 
-We just want to see the counts for a particular biological sample
-
-```{r}
-brca_tidy %>% 
-  filter(patient == "TCGA-BH-A0EE") %>% 
-  dplyr::select(.feature,counts) %>% slice(1:10)
-```
-
 We want the counts for a particular gene, and which sample it is most highly-expressed in 
 
 ```{r}
 brca_tidy %>% 
   filter(.feature == "ENSG00000000003") %>% 
     dplyr::select(counts,patient) %>% 
-    arrange(desc(counts))
+    arrange(desc(counts)) %>% 
+  slice(1:10)
 ```
 
 Or calculate the average expression in different groups.
 
-```{r}
+```{r results = "asis"}
 brca_tidy %>% 
   filter(.feature == "ENSG00000000003") %>% 
     group_by(shortLetterCode) %>% 
@@ -107,7 +107,7 @@ brca_tidy %>%
 
 Counting the total number of reads in each sample as a QC metric
 
-```{r}
+```{r results = "asis"}
 brca_tidy %>% 
   group_by(.sample) %>% 
   summarise(LibrarySize = sum(counts)) %>% 
@@ -123,7 +123,7 @@ The above were examples of using the standard `tidyverse` operations. The `tidyb
 
 ```{r}
 counts_filtered <- brca_tidy %>% keep_abundant(factor_of_interest=er_status_by_ihc)
-counts_filtered %>% slice(1:10)
+counts_filtered %>% slice(1:10) %>% dplyr::select(1:4)
 ```
 
 ## Scaling counts to normalise
@@ -144,13 +144,13 @@ counts_scal_PCA <-
   reduce_dimensions(method="PCA")
 ```
 
-```{r}
+```{r results = "asis"}
 counts_scal_PCA %>% pivot_sample() %>% 
   dplyr::select(.sample,patient,shortLetterCode,contains("PC"))
 ```
 A basic PCA visualisation will show the values of PC1 and PC2 using a scatter plot.
 
-```{r}
+```{r results = "asis"}
 library(ggplot2)
 
 counts_scal_PCA %>%
@@ -163,7 +163,7 @@ This clearly shows a separation samples. Our hope is that the separation can be 
 
 Although not very helpful in this case, it is often useful to add labels corresponding to sample names
 
-```{r}
+```{r results = "asis"}
 library(ggrepel)
 counts_scal_PCA %>%
     pivot_sample() %>%
@@ -173,7 +173,7 @@ counts_scal_PCA %>%
 
 Colouring the points according to variables in the data is often informative. In our case we have several clinial characteristics listed that we could try. The `shortLetterCode` corresponds to whether a particular sample is a primary tumour (TP) or normal tissue (NT) is a perfect candidate to try.
 
-```{r}
+```{r results = "asis"}
 counts_scal_PCA %>%
     pivot_sample() %>%
     ggplot(aes(x=PC1, y=PC2, col = shortLetterCode)) +
@@ -230,13 +230,13 @@ ens_ids <- pull(counts_filtered, .feature) %>% unique
 
 The overall strategy is to use `org.Hs.eg.db` to convert between one type of ID (ENSEMBL in our case) to another. We can try the official gene symbol and gene name. For non-human data, equivalent packages are available. e.g. `org.Mm.eg.db` for mouse.
 
-```{r}
+```{r results = "asis"}
 library(org.Hs.eg.db)
 anno <- AnnotationDbi::select(org.Hs.eg.db,
                               keys = ens_ids,
                               columns = c("SYMBOL","GENENAME"),
                               keytype = "ENSEMBL")
-anno
+anno %>% slice(1:10)
 ```
 
 
@@ -260,7 +260,7 @@ counts_de <- counts_filtered %>%
 
 The results are still in a *long* format table. This is actually not very helpful, and would prefer to have a single row for each gene tested. The function `pivot_transcript` performs the reshaping. We can now add the gene annotation we created earlier, but retain the original Ensembl IDs so we can retrieve count information. The final `arrange` line orders by significance.
 
-```{r}
+```{r results = "asis"}
 results_table <- counts_de %>% 
   pivot_transcript() %>% 
   left_join(anno, by=c(".feature"="ENSEMBL")) %>% 
@@ -275,7 +275,7 @@ A volcano plot is a common visualisation that shows the degree of significance a
 
 It would be perfectly possible to make the plot using standard `ggplot2` code. However, the `EnhancedVolcano` package simplifies the process and offers some additional features such as automatically labelling the significant genes.
 
-```{r}
+```{r results = "asis"}
 library(EnhancedVolcano)
 EnhancedVolcano(results_table, 
                 lab = results_table$SYMBOL,
@@ -298,6 +298,7 @@ plot_data <- counts_filtered %>%
   filter(.feature %in% top_genes) %>% 
   left_join(anno, by = c(".feature" = "ENSEMBL"))
 ```
+
 A series of boxplots can now be created, with a facet introduced so that a separate plot is made for each gene.
 
 ```{r}
