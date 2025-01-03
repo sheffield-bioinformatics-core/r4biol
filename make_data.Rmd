@@ -10,7 +10,8 @@ output: html_notebook
 library(messy)
 set.seed(20250102)
 old <- read_tsv("tcga_clinical_CLEANED.tsv")  %>% 
-  select(tumor_tissue_site,
+  select(bcr_patient_barcode,
+         tumor_tissue_site,
                         gender,
                         age_at_diagnosis,
                         height_at_diagnosis = height_cm_at_diagnosis) %>% 
