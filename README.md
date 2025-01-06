@@ -55,7 +55,8 @@ BiocManager::install(c("SummarizedExperiment",
 
 ### Materials
 
-- [HTML](Part2.nb.html)
+- [HTML](Part2.html)
 - [Markdown](Part2.Rmd)
- 
+- [Breast Cancer RNA-Seq counts](brca_example.tsv)
+- [Breast Cancer RNA-Seq metadata](brca_example_meta.tsv)
   
