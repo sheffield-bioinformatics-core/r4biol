@@ -3,7 +3,7 @@
 
 # R for Biological Data Analysis
 
-## Part 1 (R with a biological twist)
+## Part 1 (R for Medical Data)
 
 ### Overview
 
@@ -14,7 +14,9 @@
 + boxplots and bar plots
 + "piping" to create short workflows
 
-### Package install
+### Pre-course package install
+
+Please install the following packages **before the course** using the following code:-
 
 ```
 install.packages(c("readr",
@@ -24,24 +26,31 @@ install.packages(c("readr",
                   "forcats"))
 ```
 
+### Pre-course downloads
+
+Please download all these files and place in a folder that you wish to work in
+
++ [Example Data (tcga_clinical_CLEANED.tsv)](tcga_clinical_CLEANED.tsv)
++ [Example Data 2 (tcga_clinical_MESSY.tsv)](tcga_clinical_MESSY.tsv)
++ [R Markdown](Part1.Rmd)
+
 ### Materials
 
 + [HTML](Part1.nb.html)
-+ [Markdown](Part1.Rmd)
-+ [Example Data (tcga_clinical_CLEANED.tsv)](tcga_clinical_CLEANED.tsv)
-+ [Example Data 2 (tcga_clinical_MESSY.tsv)](tcga_clinical_MESSY.tsv)
 
-## Part 2 (Tidy RNA-seq)
+## Part 2 (R for omics analysis)
 
 ### Overview
 
-+ Import some RNA-sequencing counts
-+ long vs wide data
++ Importing some RNA-sequencing counts
 + Using PCA as QC diagnostic
 + Differential expression to find statistically-significant genes
++ Using databases to map between gene naming schemes
 + Associating statistical findings with biological and clinical significance
 
 ### Package Install
+
+Please install the following packages **before the course** using the following code:-
 
 ```
 install.packages("BiocManager")
@@ -53,10 +62,14 @@ BiocManager::install(c("SummarizedExperiment",
 
 ```
 
-### Materials
+### Download before the course
 
-- [HTML](Part2.html)
-- [Markdown](Part2.Rmd)
 - [Breast Cancer RNA-Seq counts](brca_example.tsv)
 - [Breast Cancer RNA-Seq metadata](brca_example_meta.tsv)
+- [R Markdown](Part2.Rmd)
+
+### Rendered Materials
+
+- [HTML](Part2.html)
+
   
