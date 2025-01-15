@@ -1,9 +1,9 @@
 
 ![](logo-sm.png)
 
-# R for Biological Data Analysis
+# R for Biological / Medical Data Analysis
 
-## Part 1 (R for Medical Data)
+## Part 1 (R for Medical Data) - January 22nd 9:00 - 12:00
 
 ### Overview
 
@@ -38,7 +38,7 @@ Please download all these files and place in a folder that you wish to work in
 
 + [HTML](Part1.nb.html)
 
-## Part 2 (R for omics analysis)
+## Part 2 (R for omics analysis) - January 29th 09:00 -12:00
 
 ### Overview
 
