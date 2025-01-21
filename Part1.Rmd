@@ -399,7 +399,13 @@ A comprehensive guide to the issues surrounding data entry via spreadsheets, and
 
 - [Data Carpentry Spreadsheets lesson](https://data-lessons.github.io/gapminder-spreadsheet/)
 
-However, for public data that we have no control over we often have no choice but to clean the data ourselves. We have intentionally created an alternative dataset with a few intentional issues to illustrate the cleaning process.
+However, for public data that we have no control over we often have no choice but to clean the data ourselves. We have intentionally created an alternative dataset with a few intentional issues to illustrate the cleaning process. The following code will download the data if you do not have it already.
+
+```{r}
+if(!file.exists("tcga_clinical_MESSY.tsv")) download.file(url = "https://sbc.shef.ac.uk/r4biol/tcga_clinical_MESSY.tsv", 
+              destfile = "tcga_clinical_MESSY.tsv")
+```
+
 
 ```{r}
 messy <- read_tsv("tcga_clinical_MESSY.tsv")
